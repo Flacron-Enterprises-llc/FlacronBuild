@@ -3,6 +3,12 @@ jobs:
   cypress-run:
     # Use the latest Ubuntu version for the runner environment
     runs-on: ubuntu-latest 
+    
+    # Set the working directory for all 'run' commands in this job to the project folder
+    defaults:
+      run:
+        working-directory: Web-Automatio
+        
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -13,28 +19,27 @@ jobs:
         with:
           node-version: 20
 
-      # 2. Install dependencies
-      # The 'working-directory' tells the 'run' command to execute inside 'Web-Automatio'
+      # 2. Install dependencies (Runs inside Web-Automatio due to 'defaults' block)
       - name: Install Dependencies
         run: npm install
-        working-directory: Web-Automatio
 
       # 3. Run Cypress Tests
-      # 'install-dir' is the correct input for cypress-io/github-action to locate the project.
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
-         # Tell the action where the package.json and cypress files are located
-         install-dir: Web-Automatio 
+         # CRITICAL FIX 1: Use the correct input for the project path.
+         working-directory: Web-Automatio 
+         # CRITICAL FIX 2: Set install to false to prevent the failing 'npm ci' command.
+         install: false
          command: npm run test:homewoner-signup-test 
          browser: firefox
         env:
           CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
 
       # 4. Upload Report Artifact
-      # The report path is adjusted to be relative to the root, pointing into the project folder.
       - name: Upload Signup Test Report
         uses: actions/upload-artifact@v4
         with:
          name: Signup Mochawesome HTML Report 
+         # Path is relative to the repository root.
          path: Web-Automatio/cypress/reports/html
