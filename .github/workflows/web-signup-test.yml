@@ -1,23 +1,35 @@
-name: HomeOwner SignUp tests
 on: push
 jobs:
   cypress-run:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
-      # Install npm dependencies, cache them correctly
-      # and run HomwOwner Cypress tests
+        uses: actions/checkout@v4
+
+      # 1. Add step to setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20 # Use your desired version
+
+      # 2. Add step to install dependencies inside the project folder
+      - name: Install Dependencies
+        run: npm install
+        working-directory: Web-Automatio # Install dependencies here
+
+    # 3. The main Cypress run step
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
-         command: npm run test:homewoner-signup-test
+         # Use the install-dir input to point the action to the project location
+         install-dir: Web-Automatio 
+         command: npm run test:homewoner-signup-test 
          browser: firefox
-         working-directory: Web-Automatio
         env:
           CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
+
       - name: SignUp Test Report
-      - uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
-         name: Signup Mochawesome HTML Report
-         path: cypress/reports/html
+         name: Signup Mochawesome HTML Report 
+         path: Web-Automatio/cypress/reports/html # Adjust path if report is in Web-Automatio
