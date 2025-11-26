@@ -21,7 +21,8 @@ jobs:
 
       # 2. Install dependencies (Runs inside Web-Automatio due to 'defaults' block)
       - name: Install Dependencies
-        run: npm install
+        # --- EDITED: Added --loglevel verbose to debug exit code 1 failure ---
+        run: npm install --loglevel verbose
 
       # 3. Run Cypress Tests
       - name: Cypress run
