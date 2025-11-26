@@ -11,6 +11,13 @@ jobs:
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
+         browser: firefox
+        env:
+          CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
+          working-directory: Web-Automatio
+      - name: Cypress run
+        uses: cypress-io/github-action@v6
+        with:
           browser : firefox
       - name: SignUp Test Report
       - uses: actions/upload-artifact@v4
