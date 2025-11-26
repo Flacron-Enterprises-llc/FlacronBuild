@@ -1,0 +1,29 @@
+name: HomeOwner SignUp Tests - Multi Browser
+on: push
+
+jobs:
+  SignUp-Test-Run:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        browser: [chrome, firefox, edge]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Cypress Run on ${{ matrix.browser }}
+        uses: cypress-io/github-action@v6
+        with:
+          browser: ${{ matrix.browser }}
+          command: npm run test:homewoner-signup-test   # change here if needed
+
+      - name: Upload Mochawesome Report (${{ matrix.browser }})
+        uses: actions/upload-artifact@v4
+        with:
+         name: Signup-Report-${{ matrix.browser }}
+         path: cypress/reports/html
+
+        
+   
+

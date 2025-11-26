@@ -1,0 +1,88 @@
+name: Parallel cross browser SignUp tests
+on: push
+
+jobs:
+
+  HomwOwner-Signup-run:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        browser: [chrome, firefox, edge]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cypress run (Home Owner Signup) on ${{ matrix.browser }}
+        uses: cypress-io/github-action@v6
+        with:
+          browser: ${{ matrix.browser }}
+          command: npm run test:homewoner-signup-test
+
+      - name: Upload HomeOwner Signup Report
+        uses: actions/upload-artifact@v4
+        with:
+         name: HomeOwner-${{ matrix.browser }}-Mochawesome-Report
+         path: cypress/reports/html
+
+  Contractor-Signup-run:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        browser: [chrome, firefox, edge]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cypress run (Contractor Signup) on ${{ matrix.browser }}
+        uses: cypress-io/github-action@v6
+        with:
+          browser: ${{ matrix.browser }}
+          command: npm run test:contractor-signup-test
+
+      - name: Upload Contractor Signup Report
+        uses: actions/upload-artifact@v4
+        with:
+         name: Contractor-${{ matrix.browser }}-Mochawesome-Report
+         path: cypress/reports/html
+
+  Inspector-SignUp-run:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        browser: [chrome, firefox, edge]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cypress run (Inspector Signup) on ${{ matrix.browser }}
+        uses: cypress-io/github-action@v6
+        with:
+          browser: ${{ matrix.browser }}
+          command: npm run test:inspector-signup-test
+
+      - name: Upload Inspector Signup Report
+        uses: actions/upload-artifact@v4
+        with:
+         name: Inspector-${{ matrix.browser }}-Mochawesome-Report
+         path: cypress/reports/html
+
+  InsuranceAdjuster-SingUp-run:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        browser: [chrome, firefox, edge]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cypress run (Insurance Adjuster Signup) on ${{ matrix.browser }}
+        uses: cypress-io/github-action@v6
+        with:
+          browser: ${{ matrix.browser }}
+          command: npm run test:insuranceAdjusterSignUpTest-signup-test
+
+      - name: Upload Insurance Adjuster Signup Report
+        uses: actions/upload-artifact@v4
+        with:
+         name: InsuranceAdjuster-${{ matrix.browser }}-Mochawesome-Report
+         path: cypress/reports/html
