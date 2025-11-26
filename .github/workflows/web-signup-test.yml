@@ -7,18 +7,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       # Install npm dependencies, cache them correctly
-      # and run all Cypress tests
+      # and run HomwOwner Cypress tests
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
+         command: npm run test:homewoner-signup-test
          browser: firefox
         env:
           CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
           working-directory: Web-Automatio
-      - name: Cypress run
-        uses: cypress-io/github-action@v6
-        with:
-          browser : firefox
       - name: SignUp Test Report
       - uses: actions/upload-artifact@v4
         with:
