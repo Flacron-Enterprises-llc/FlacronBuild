@@ -1,37 +1,40 @@
 on: push
 jobs:
   cypress-run:
-    runs-on: ubuntu-latest # Changed to 'ubuntu-latest' for broader compatibility
+    # Use the latest Ubuntu version for the runner environment
+    runs-on: ubuntu-latest 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. Setup Node.js
+      # 1. Setup Node.js Environment (Required for npm and Cypress)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 2. Install dependencies (Uses 'run', so 'working-directory' is valid)
+      # 2. Install dependencies
+      # The 'working-directory' tells the 'run' command to execute inside 'Web-Automatio'
       - name: Install Dependencies
         run: npm install
-        working-directory: Web-Automatio 
+        working-directory: Web-Automatio
 
-      # 3. Run Cypress (Uses 'uses', so 'install-dir' in the 'with' block is required)
+      # 3. Run Cypress Tests
+      # 'install-dir' is the correct input for cypress-io/github-action to locate the project.
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
-         install-dir: Web-Automatio # Tells the action where the Cypress project is
+         # Tell the action where the package.json and cypress files are located
+         install-dir: Web-Automatio 
          command: npm run test:homewoner-signup-test 
          browser: firefox
         env:
           CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
 
-      # 4. Upload Report
-      - name: SignUp Test Report
+      # 4. Upload Report Artifact
+      # The report path is adjusted to be relative to the root, pointing into the project folder.
+      - name: Upload Signup Test Report
         uses: actions/upload-artifact@v4
         with:
          name: Signup Mochawesome HTML Report 
-         # Path is relative to the workflow root, but since tests ran 
-         # in Web-Automatio, the report is generated there.
          path: Web-Automatio/cypress/reports/html
