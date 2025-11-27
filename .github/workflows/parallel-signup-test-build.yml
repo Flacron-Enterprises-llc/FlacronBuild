@@ -1,0 +1,171 @@
+name: Parallel Signup  tests
+
+on:
+  push:
+    branches:
+      - web-signup-tests   # Test branch
+
+jobs:
+  HomeOwner-run:
+    runs-on: ubuntu-24.04
+
+    steps:
+      # 1. Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # 2. Set Node version
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # 3. Go inside your QA folder (important!)
+      - name: Change to Web-Automatio folder
+        run: cd Web-Automatio
+
+      # 4. Install dependencies
+      - name: Install dependencies
+        working-directory: Web-Automatio
+        run: npm install
+
+      # 5. Run Cypress test with custom script + browser selection
+      - name: Run Cypress Tests
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          command: npm run test:homewoner-signup-test
+          browser: firefox
+        env:
+          CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
+
+      # 6. Upload Mochawesome HTML reports
+      - name: Upload Mochawesome Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeOwner-SignUp-Report
+          path: Web-Automatio/cypress/reports/html
+
+  contractor-run:
+    runs-on: ubuntu-24.04
+
+    steps:
+      # 1. Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # 2. Set Node version
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # 3. Go inside your QA folder (important!)
+      - name: Change to Web-Automatio folder
+        run: cd Web-Automatio
+
+      # 4. Install dependencies
+      - name: Install dependencies
+        working-directory: Web-Automatio
+        run: npm install
+
+      # 5. Run Cypress test with custom script + browser selection
+      - name: Run Cypress Tests
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          command: npm run test:contractor-signup-test
+          browser: chrome
+        env:
+          CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
+
+      # 6. Upload Mochawesome HTML reports
+      - name: Upload Mochawesome Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: contractor-SignUp-Report
+          path: Web-Automatio/cypress/reports/html
+
+    inspector-run:
+    runs-on: ubuntu-24.04
+
+    steps:
+      # 1. Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # 2. Set Node version
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # 3. Go inside your QA folder (important!)
+      - name: Change to Web-Automatio folder
+        run: cd Web-Automatio
+
+      # 4. Install dependencies
+      - name: Install dependencies
+        working-directory: Web-Automatio
+        run: npm install
+
+      # 5. Run Cypress test with custom script + browser selection
+      - name: Run Cypress Tests
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          command: npm run test:inspector-signup-test
+          browser: chrome
+        env:
+          CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
+
+      # 6. Upload Mochawesome HTML reports
+      - name: Upload Mochawesome Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: Inspector-SignUp-Report
+          path: Web-Automatio/cypress/reports/html
+
+ insuranceAdjusterSignUpTest-run:
+    runs-on: ubuntu-24.04
+
+    steps:
+      # 1. Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # 2. Set Node version
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # 3. Go inside your QA folder (important!)
+      - name: Change to Web-Automatio folder
+        run: cd Web-Automatio
+
+      # 4. Install dependencies
+      - name: Install dependencies
+        working-directory: Web-Automatio
+        run: npm install
+
+      # 5. Run Cypress test with custom script + browser selection
+      - name: Run Cypress Tests
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          command: npm run test:insuranceAdjusterSignUpTest-signup-test
+          browser: chrome
+        env:
+          CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
+
+      # 6. Upload Mochawesome HTML reports
+      - name: Upload Mochawesome Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: InsuranceAdjusterSignUpTest-SignUp-Report
+          path: Web-Automatio/cypress/reports/html
+
+
+
+
