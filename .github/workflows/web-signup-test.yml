@@ -1,44 +1,12 @@
-name: HomeOwner SignUp tests
-on:
-  push:
-    branches:
-      - web-signup-tests
-
+name: Test On Chrome Browser
+on: push
 jobs:
-  cypress-run:
-    runs-on: ubuntu-latest
-
+  chrome:
+    runs-on: ubuntu-22.04
+    name: E2E on Chrome
     steps:
-      # Checkout
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      # Setup Node
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v3
+      - uses: cypress-io/github-action@v5
         with:
-          node-version: 20
-
-      # Manual install instead of npm ci
-      - name: Install dependencies
-        working-directory: Web-Automatio
-        run: npm install
-
-      # Run Cypress
-      - name: Run Cypress tests
-        uses: cypress-io/github-action@v6
-        with:
-          working-directory: Web-Automatio
-
-          # 🔥 This is the KEY to stopping npm ci
-          install: false
-
-          # Your test script
-          command: npm run test:homewoner-signup-test
-
-      # Upload report
-      - name: Upload report
-        uses: actions/upload-artifact@v4
-        with:
-          name: mochawesome-html-report
-          path: Web-Automatio/cypress/reports/html
+         
+         command: npm run test:browser
