@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "serve": "serve -s build",
-    "test:homewoner-signup-test": "npx cypress run --browser edge --spec cypress/e2e/tests/web-signup-test/homeOwnerSignUpTest.cy.js",
+    "test:homewoner-signup-test": "npx cypress run --spec cypress/e2e/tests/web-signup-test/homeOwnerSignUpTest.cy.js",
     "test:contractor-signup-test": "npx cypress run --spec cypress/e2e/tests/web-signup-test/contractorSignUpTest.cy.js",
     "test:inspector-signup-test": "npx cypress run --spec cypress/e2e/tests/web-signup-test/inspectorSignUpTest.cy.js",
     "test:insuranceAdjusterSignUpTest-signup-test": "npx cypress run --spec cypress/e2e/tests/web-signup-test/insuranceAdjusterSignUpTest.cy.js",
