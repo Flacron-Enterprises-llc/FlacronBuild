@@ -7,38 +7,39 @@ on:
 
 jobs:
   cypress-run:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     steps:
+      # Checkout
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      # Node environment
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # MANUAL INSTALL (fixes npm ci failure)
-      - name: Install dependencies manually
+      # Install dependencies manually (NOT using npm ci)
+      - name: Install dependencies
         working-directory: Web-Automatio
         run: npm install
 
+      # Run Cypress using GitHub Action
       - name: Run Cypress tests
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
 
-          # IMPORTANT – disable npm ci from Cypress Action
+          # 🔥 REQUIRED – disables npm ci automatically
           install: false
 
-          # Correct script name (your package.json uses "homewoner")
+          # Correct test script (your actual script name)
           command: npm run test:homewoner-signup-test
 
-          # Browser selection
-          browser: firefox  
-
-      - name: Upload HTML Reports
+      # Upload reports
+      - name: Upload Mochawesome Report
         uses: actions/upload-artifact@v4
         with:
-          name: homeowner-signup-report
+          name: mochawesome-report
           path: Web-Automatio/cypress/reports/html
