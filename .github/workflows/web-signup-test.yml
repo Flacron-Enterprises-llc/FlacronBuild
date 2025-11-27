@@ -1,38 +1,28 @@
-name: HomeOwner SignUp Test On Chrome Browser
+name: Test On Chrome Browser
 
 on:
   push:
 
 jobs:
   chrome:
-    name: SignUpTest on Chrome
+    name: E2E on Chrome
     runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
+      # Install dependencies manually (so we avoid npm ci)
       - name: Install dependencies
         working-directory: ./Web-Automatio
         run: npm install
 
+      # Run Cypress without auto-install
       - name: Run Cypress Tests
-        uses: cypress-io/github-action@v5
+        uses: cypress-io/github-action@v6
         with:
           working-directory: ./Web-Automatio
-          runTests: true
+          install: false
+          build: false
+          start: false
           command: npm run test:homewoner-signup-test
-
-      # Merge Mochawesome JSON files
-      - name: Merge Mochawesome Reports
-        working-directory: ./Web-Automatio
-        run: |
-          npx mochawesome-merge cypress/reports/mochawesome/*.json > mochawesome.json
-          npx marge mochawesome.json --reportDir mochawesome-report
-
-      # Upload Test Report Artifacts
-      - name: Upload Mochawesome HTML Report
-        uses: actions/upload-artifact@v3
-        with:
-          name: mochawesome-report
-          path: Web-Automatio/mochawesome-report
