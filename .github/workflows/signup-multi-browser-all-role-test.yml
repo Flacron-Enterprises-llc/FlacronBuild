@@ -28,6 +28,7 @@ jobs:
 
       - name: Run Cypress on each browser
         uses: cypress-io/github-action@v6
+        if: always()      
         with:
           working-directory: Web-Automatio
           install: false
