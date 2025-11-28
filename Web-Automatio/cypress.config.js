@@ -13,7 +13,8 @@ module.exports = defineConfig({
     reportFilename: "[name]"+ `report-${new Date().toISOString().replace(/[:.]/g, '-')}`,  
     reportPageTitle: "Test Report",
     embeddedScreenshots: true,
-    inlineAssets: true
+    inlineAssets: true,
+    saveAllAttempts: true
   },
 
   projectId: "2hxc8g",
