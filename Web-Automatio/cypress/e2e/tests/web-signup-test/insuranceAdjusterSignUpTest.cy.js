@@ -98,7 +98,8 @@ describe('Test SignUp Flow of Contractor' ,()=>{
        ProfileObj.enterAdjusterID(faker.number.romanNumeral())
        ProfileObj.selectRandomClaimTypesHandledOptions()
        ProfileObj.enterJurisdictionLocation(faker.location.secondaryAddress())
-            
+
+        cy.wait(1000)
        ProfileObj.clickNext()
      
 
@@ -206,12 +207,12 @@ describe('Test SignUp Flow of Contractor' ,()=>{
      
       cy.wait(1000)
        
-         ProfileObj.enterCompanyName(faker.company.name())
+       ProfileObj.enterCompanyName(faker.company.name())
        ProfileObj.enterAdjusterID(faker.number.romanNumeral())
        ProfileObj.selectRandomClaimTypesHandledOptions()
        ProfileObj.enterJurisdictionLocation(faker.location.secondaryAddress())
         
-          
+       cy.wait(1000)
        ProfileObj.clickNext()
 
        cy.log("======= Review Page ======")    
