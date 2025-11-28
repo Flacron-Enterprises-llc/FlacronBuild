@@ -1,0 +1,128 @@
+name: Parallel Signup Test Build
+
+on:
+  push:
+    branches:
+      - web-signup-tests
+
+jobs:
+
+  homeowner-run:
+    name: Homeowner Signup Test on Chrome
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+         node-version: 22
+
+
+      - name: Install Dependencies
+        working-directory: Web-Automatio
+        run: npm install
+
+      - name: Run Homeowner Signup Test
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          command: npm run test:homewoner-signup-test
+          browser: chrome
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: homeowner-signup-report
+          path: Web-Automatio/cypress/reports/html
+
+  contractor-run:
+    name: Contractor Signup Test on Chrome
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        working-directory: Web-Automatio
+        run: npm install
+
+      - name: Run Contractor Signup Test
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          command: npm run test:contractor-signup-test
+          browser: chrome
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contractor-signup-report
+          path: Web-Automatio/cypress/reports/html
+
+  inspector-run:
+    name: Inspector Signup Test On Edge
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        working-directory: Web-Automatio
+        run: npm install
+
+      - name: Run Inspector Signup Test
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          command: npm run test:inspector-signup-test
+          browser: edge
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: inspector-signup-report
+          path: Web-Automatio/cypress/reports/html
+
+  insurance-adjuster-run:
+    name: Insurance Adjuster Signup Test On FireFox
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        working-directory: Web-Automatio
+        run: npm install
+
+      - name: Run Insurance Adjuster Signup Test
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          command: npm run test:insuranceAdjuster-signup-test
+          browser: firefox
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: insurance-adjuster-signup-report
+          path: Web-Automatio/cypress/reports/html

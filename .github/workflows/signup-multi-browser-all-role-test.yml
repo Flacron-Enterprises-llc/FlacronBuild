@@ -1,0 +1,41 @@
+name: SignUp Multi-Browser Tests - For all roles
+
+on:
+  push:
+    branches:
+      - web-signup-tests
+
+jobs:
+  cross-browser:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox, edge]  # Auto run on all 3
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Dependencies
+        working-directory: Web-Automatio
+        run: npm install
+
+      - name: Run Cypress on each browser
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          install: false
+          browser: ${{ matrix.browser }}
+          spec: "**/*.cy.js"
+
+      - name: Upload Mochawesome Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-browser-${{ matrix.browser }}-report
+          path: Web-Automatio/cypress/reports/html

@@ -97,9 +97,9 @@ describe('Test SignUp Flow of Insurnce Adjuster' ,()=>{
        ProfileObj.enterCompanyName(faker.company.name())
        ProfileObj.enterAdjusterID(faker.number.romanNumeral())
        ProfileObj.selectRandomClaimTypesHandledOptions()
+       cy.wait(1000)
        ProfileObj.enterJurisdictionLocation(faker.location.secondaryAddress())
-            
-        cy.wait(1000)
+       cy.wait(1000)
        ProfileObj.clickNext()
      
 
@@ -110,7 +110,7 @@ describe('Test SignUp Flow of Insurnce Adjuster' ,()=>{
       // reviewPageObj.validateBackButton()
        reviewPageObj.validateDataBox()
        signUpData.saveEnteredName
-        reviewPageObj.verifyPlanDetails();  // Dynamically verify plan, billing, price
+       reviewPageObj.verifyPlanDetails();  // Dynamically verify plan, billing, price
 
       // reviewPageObj.validateData()   
 
@@ -207,12 +207,13 @@ describe('Test SignUp Flow of Insurnce Adjuster' ,()=>{
      
       cy.wait(1000)
        
-         ProfileObj.enterCompanyName(faker.company.name())
+       ProfileObj.enterCompanyName(faker.company.name())
        ProfileObj.enterAdjusterID(faker.number.romanNumeral())
        ProfileObj.selectRandomClaimTypesHandledOptions()
+       cy.wait(1000)
        ProfileObj.enterJurisdictionLocation(faker.location.secondaryAddress())
         
-          
+       cy.wait(1000)
        ProfileObj.clickNext()
 
        cy.log("======= Review Page ======")    
