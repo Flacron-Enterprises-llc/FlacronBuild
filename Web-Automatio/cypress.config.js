@@ -21,7 +21,11 @@ module.exports = defineConfig({
 
   e2e: {
   //  chromeWebSecurity: false,
-    experimentalStudio: true,
+     experimentalStudio: true,
+     defaultCommandTimeout: 17000, // 15 seconds for commands like cy.get()
+     pageLoadTimeout: 70000,       // 60 seconds for page loads
+     requestTimeout: 15000,        // 15 seconds for API requests
+     responseTimeout: 16000,       // 15 seconds for API responses
 
     setupNodeEvents(on, config) {
       // Register Mochawesome plugin
