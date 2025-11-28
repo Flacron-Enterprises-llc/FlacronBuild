@@ -142,6 +142,8 @@ Run report:
 ```bash
 npm run report
 ```
+
+Report should be save with test name along with test run execution time and date.
 🧾 Naming Conventions
 
 | Type | Example |
