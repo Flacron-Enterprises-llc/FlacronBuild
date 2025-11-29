@@ -34,7 +34,7 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          spec: cypress/e2e/tests/web-signup-test/homeOwnerSignUpTest.cy.js
+          run: npm run test:homeowner-signup-test
           browser: firefox
         env:
           CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
