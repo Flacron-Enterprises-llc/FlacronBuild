@@ -20,7 +20,6 @@ jobs:
         with:
          node-version: 22
 
-
       - name: Install Dependencies
         working-directory: Web-Automatio
         run: npm install
@@ -29,14 +28,15 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          run: npm run test:homeowner-signup-test
-          browser: chrome
+          command: npm run test:homeowner-signup-test
+         
           
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
           name: homeowner-signup-report
           path: Web-Automatio/cypress/reports/html
+
 
   contractor-run:
     name: Contractor Signup Test on Chrome
@@ -60,7 +60,7 @@ jobs:
         with:
           working-directory: Web-Automatio
           command: npm run test:contractor-signup-test
-          
+       
 
       - name: Upload Report
         uses: actions/upload-artifact@v4
@@ -68,8 +68,9 @@ jobs:
           name: contractor-signup-report
           path: Web-Automatio/cypress/reports/html
 
+
   inspector-run:
-    name: Inspector Signup Test On Edge
+    name: Inspector Signup Test on Edge
     runs-on: ubuntu-24.04
 
     steps:
@@ -89,18 +90,18 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          run: npm run test:inspector-signup-test
-          browser: edge
+          command: npm run test:inspector-signup-test
+         
           
-
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
           name: inspector-signup-report
           path: Web-Automatio/cypress/reports/html
 
+
   insurance-adjuster-run:
-    name: Insurance Adjuster Signup Test On FireFox
+    name: Insurance Adjuster Signup Test on Firefox
     runs-on: ubuntu-24.04
 
     steps:
@@ -120,13 +121,12 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          run: npm run test:insuranceAdjuster-signup-test
-          browser: firefox
-       
+          command: npm run test:insuranceAdjuster-signup-test
+          
 
       - name: Upload Report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: insurance-adjuster-signup-report
-          path:  Web-Automatio/cypress/reports/html
+          path: Web-Automatio/cypress/reports/html
