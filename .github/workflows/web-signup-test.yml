@@ -5,38 +5,35 @@ on:
       - web-signup-tests   # your branch
 
 jobs:
-  Homeowner-signup-run:
+  contractor-run:
+    name: Contractor Signup Test on Chrome
     runs-on: ubuntu-24.04
 
     steps:
-      # 1. Checkout repo
-      - name: Checkout repository
-        uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # 2. Set Node version
-      - name: Use Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # 3. Go inside your QA folder (important!)
-      - name: Change to Web-Automatio folder
-        run: cd Web-Automatio
-
-      # 4. Install dependencies
-      - name: Install dependencies
+      - name: Install Dependencies
         working-directory: Web-Automatio
         run: npm install
 
-      # 5. Run Cypress test with custom script + browser selection
-      - name: Run Cypress Tests
+      - name: Run Contractor Signup Test
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
           run: npm run test:homeowner-signup-test
-          browser: firefox
-        env:
-          CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
+          browser: chrome          
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contractor-signup-report
+          path: Web-Automatio/cypress/reports/html
 
       # 6. Upload Mochawesome HTML reports
       - name: Upload Mochawesome Reports
