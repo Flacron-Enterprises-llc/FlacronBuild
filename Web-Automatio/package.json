@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-  "test:homeowner-signup-test": "cypress run --spec cypress/e2e/homeowner_signup.cy.js",
-  "test:homeowner-signup-test": "cypress run --browser firefox --headed --spec cypress/e2e/homeowner_signup.cy.js",
-  "test:homeowner-signup-test": "cypress run --browser edge --headed --spec cypress/e2e/homeowner_signup.cy.js"
+  "test:contractor-signup-test": "npx cypress run --spec cypress/e2e/tests/web-signup-test/contractorSignUpTest.cy.js --browser edge" ,
+  "test:inspector-signup-test": "npx cypress run --spec cypress/e2e/tests/web-signup-test/inspectorSignUpTest.cy.js --browser chrome",
+  "test:insuranceAdjuster-signup-test": "npx cypress run --spec cypress/e2e/tests/web-signup-test/insuranceAdjusterSignUpTest.cy.js --browser firefox",
+   
   "test": "npx cypress run --record --key a4b817fc-229c-455e-8b61-d3acbab04afa"
   },
   "repository": {
