@@ -2,6 +2,8 @@ const { defineConfig } = require("cypress");
 
 module.exports = defineConfig({
 
+   projectId: "oanr4m",
+
   reporter: "cypress-mochawesome-reporter",
   video: true,
 
@@ -17,9 +19,7 @@ module.exports = defineConfig({
     saveAllAttempts: true
   },
 
-  projectId: "2hxc8g",
-
-  e2e: {
+   e2e: {
   //  chromeWebSecurity: false,
      experimentalStudio: true,
      defaultCommandTimeout: 17000, // 15 seconds for commands like cy.get()
