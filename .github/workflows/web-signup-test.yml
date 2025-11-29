@@ -5,8 +5,8 @@ on:
       - web-signup-tests   # your branch
 
 jobs:
-  contractor-run:
-    name: Contractor Signup Test on Chrome
+  homeowner-run:
+    name: HomeOwner Signup Test on Chrome
     runs-on: ubuntu-24.04
 
     steps:
