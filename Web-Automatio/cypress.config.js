@@ -1,4 +1,16 @@
-const { defineConfig } = require("cypress");
+
+
+
+
+
+
+
+
+
+
+
+
+onst { defineConfig } = require("cypress");
 
 module.exports = defineConfig({
 
@@ -41,8 +53,7 @@ module.exports = defineConfig({
      experimentalStudio: true,
      defaultCommandTimeout: 30000,
     pageLoadTimeout: 60000,
-    viewportWidth: 1280,
-    viewportHeight: 720,
+   
 
     setupNodeEvents(on, config) {
       // Register Mochawesome plugin
