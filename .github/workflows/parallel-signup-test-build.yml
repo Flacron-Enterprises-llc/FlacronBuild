@@ -1,5 +1,5 @@
 name: Parallel Signup Test Build
- 
+
 on:
   push:
     branches:
@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-         node-version: 23.5.0
+         node-version: 22
 
 
       - name: Install Dependencies
@@ -29,8 +29,8 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          command: npm run test:homeowner-signup-test 
-       
+          command: npm run test:homeowner-signup-test
+          browser: chrome
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
@@ -59,7 +59,8 @@ jobs:
         with:
           working-directory: Web-Automatio
           command: npm run test:contractor-signup-test
-       
+          browser: chrome
+
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
@@ -88,7 +89,8 @@ jobs:
         with:
           working-directory: Web-Automatio
           command: npm run test:inspector-signup-test
-         
+          browser: edge
+
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
@@ -117,7 +119,7 @@ jobs:
         with:
           working-directory: Web-Automatio
           command: npm run test:insuranceAdjuster-signup-test
-          
+          browser: firefox
 
       - name: Upload Report
         uses: actions/upload-artifact@v4
@@ -125,5 +127,3 @@ jobs:
         with:
           name: insurance-adjuster-signup-report
           path:  Web-Automatio/cypress/reports/html
-
-     
