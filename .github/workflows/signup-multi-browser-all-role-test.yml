@@ -33,6 +33,7 @@ jobs:
           working-directory: Web-Automatio
           install: false
           browser: ${{ matrix.browser }}
+          headed: true
           spec: "**/*.cy.js"
 
       - name: Upload Mochawesome Reports
