@@ -37,5 +37,3 @@ jobs:
         with:
           name: homeowner-signup-report
           path: Web-Automatio/cypress/reports/html
-
-          
