@@ -1,12 +1,11 @@
 name: Homeowner Signup tests
-
 on:
   push:
     branches:
       - web-signup-tests   # your branch
 
 jobs:
-  homeowner-signup-run:
+  cypress-run:
     runs-on: ubuntu-24.04
 
     steps:
@@ -18,7 +17,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 23.5.0
+          node-version: 18
 
       # 3. Go inside your QA folder (important!)
       - name: Change to Web-Automatio folder
@@ -35,7 +34,7 @@ jobs:
         with:
           working-directory: Web-Automatio
           command: npm run test:homeowner-signup-test
-         
+          browser: firefox
         env:
           CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
 
