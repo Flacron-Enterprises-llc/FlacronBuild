@@ -29,8 +29,8 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          spec: cypress/e2e/tests/web-signup-test/homeOwnerSignUpTest.cy.js
-          browser: chrome
+          command: npm run test:homeowner-signup-test 
+       
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
@@ -58,9 +58,8 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          spec: cypress/e2e/tests/web-signup-test/contractorSignUpTest.cy.js
-          browser: firefox
-
+          command: npm run test:contractor-signup-test
+       
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
@@ -88,10 +87,8 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          spec: cypress/e2e/tests/web-signup-test/inspectorSignUpTest.cy.js
-          browser: edge
-
-
+          command: npm run test:inspector-signup-test
+         
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
@@ -119,8 +116,8 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          spec: cypress/e2e/tests/web-signup-test/insuranceAdjusterSignUpTest.cy.js
-          browser: chrome
+          command: npm run test:insuranceAdjuster-signup-test
+          
 
       - name: Upload Report
         uses: actions/upload-artifact@v4
