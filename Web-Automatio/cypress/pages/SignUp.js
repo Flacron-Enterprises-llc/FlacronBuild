@@ -61,8 +61,8 @@ class SignUp {
   }
     enterPassword(Password){
 
-        cy.get(this.weblocators.password).type(Password)
-        cy.get(this.weblocators.conPassword).type(Password)
+        cy.get(this.weblocators.password, { timeout: 20000 }).type(Password)
+        cy.get(this.weblocators.conPassword, { timeout: 20000 }).type(Password)
     }
 
     
@@ -73,9 +73,13 @@ class SignUp {
 
 
     validateEmailField(email){
-        cy.get(this.weblocators.email).type(email)
-        cy.get(this.weblocators.email).then(($input) => {
-    expect($input[0].validationMessage).to.contain('@')
+        cy.get(this.weblocators.email, { timeout: 20000 }).scrollIntoView()
+  .should('be.visible')
+.type(email)
+        cy.get(this.weblocators.email, { timeout: 20000 }) .scrollIntoView()
+  .should('be.visible')
+.then(($input) => {
+    expect($input[0].validationMessage, { timeout: 20000 }).to.contain('@')
   })
                 
     }
@@ -84,14 +88,14 @@ class SignUp {
 
     ValidateInvalidPasswordLenght(Password){
 
-        cy.get(this.weblocators.password).type(Password)
-        cy.get(this.weblocators.conPassword).type(Password)
+        cy.get(this.weblocators.password, { timeout: 20000 }).type(Password)
+        cy.get(this.weblocators.conPassword, { timeout: 20000 }).type(Password)
         cy.wait(300)
-       cy.get('.gap-3 > .inline-flex').click()
-cy.wait(300)
-         cy.get(this.weblocators.invalidPwError)   // change selector as per UI
-      .should('be.visible')
-      .and('contain', 'Password must be at least 6 characters long')
+        cy.get('.gap-3 > .inline-flex',{ timeout: 20000 }).click()
+        cy.wait(300)
+        cy.get(this.weblocators.invalidPwError,{ timeout: 20000 })   // change selector as per UI
+       .should('be.visible')
+       .and('contain', 'Password must be at least 6 characters long')
 
        
     }
@@ -104,7 +108,7 @@ cy.wait(300)
         cy.get(this.weblocators.conPassword).type("123456")
         cy.wait(300)
        cy.get('.gap-3 > .inline-flex').click()
-cy.wait(300)
+       cy.wait(300)
 
          cy.get(this.weblocators.changeasswordError)
       .should('be.visible')
