@@ -1,4 +1,4 @@
-name: Updated Homwowner Signup on ff tests
+name: Homeowner Signup on ff tests
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - web-signup-tests   # your branch
 
 jobs:
-  cypress-run:
+  homeowner-signup-run:
     runs-on: ubuntu-24.04
 
     steps:
@@ -18,7 +18,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
 
       # 3. Go inside your QA folder (important!)
       - name: Change to Web-Automatio folder
@@ -34,14 +34,15 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          command: npm run test:homewoner-signup-test
-          browser: firefox
+          command: npm run test:homeowner-signup-test
+         
         env:
           CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
 
       # 6. Upload Mochawesome HTML reports
       - name: Upload Mochawesome Reports
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: HomeOwner-SignUp-Report
           path: Web-Automatio/cypress/reports/html

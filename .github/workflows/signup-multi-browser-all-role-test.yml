@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
 
       - name: Install Dependencies
         working-directory: Web-Automatio
@@ -28,14 +28,17 @@ jobs:
 
       - name: Run Cypress on each browser
         uses: cypress-io/github-action@v6
+        if: always()      
         with:
           working-directory: Web-Automatio
           install: false
           browser: ${{ matrix.browser }}
+          headed: true
           spec: "**/*.cy.js"
 
       - name: Upload Mochawesome Reports
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: multi-browser-${{ matrix.browser }}-report
           path: Web-Automatio/cypress/reports/html

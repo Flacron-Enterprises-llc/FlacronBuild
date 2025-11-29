@@ -119,14 +119,14 @@ describe('Test SignUp Flow for HomeOwner' ,()=>{
        // click button
        reviewPageObj.clickStartSubButton()
 
-   cy.wait(400)
+   cy.wait(1000)
    cy.scrollTo('top');
-   cy.wait(400)
+   cy.wait(1000)
 
      // Profile validation and logout
    profilePageObj.validateProfileIcon() 
            cy.log("======= Testing Logout ======")
-           cy.wait(400)
+           cy.wait(1000)
     profilePageObj.clickLogout()
     homeObj.varifyHomePage() //varifies user hase logout successfully
 
@@ -214,27 +214,30 @@ describe('Test SignUp Flow for HomeOwner' ,()=>{
 
        //validattion on Review page
        reviewPageObj.validatePageTitle()
+        cy.wait(1000)
       // reviewPageObj.validateBackButton()
        reviewPageObj.validateDataBox()
+        cy.wait(1000)
        signUpData.saveEnteredName
+        cy.wait(1000)
         reviewPageObj.verifyPlanDetails();  // Dynamically verify plan, billing, price
 
       // reviewPageObj.validateData()   
 
       //validate user input data should save in database and should displayed correct as user entred at the time of registration
 
-      
+       cy.wait(1000)
 
        // click button
        reviewPageObj.clickStartSubButton()
 
-       cy.wait(300)
+        cy.wait(1000)
          reviewPageObj.validateDuplicateEmail()
       
 
-   cy.wait(400)
+    cy.wait(1000)
    cy.scrollTo('top');
-   cy.wait(400)
+    cy.wait(1000)
 
    
 
@@ -259,17 +262,19 @@ describe('Test SignUp Flow for HomeOwner' ,()=>{
        //  Enter and SAVE Full Name
     const fullName = faker.person.firstName()
            signupObj.enterFullName(fullName)
-           
+            cy.wait(1000)
      
     //  Validate Email Field
    
      //  Enter and SAVE Email
  
     signupObj.validateEmailField("test")
-
+ cy.wait(1000)
       // signupObj.enterPassword(signUpData.password)
       signupObj.enterPassword(faker.internet.password({ length: 6 }))
+       cy.wait(1000)
        signupObj.clickButton()
+        cy.wait(1000)
 
       
     })
