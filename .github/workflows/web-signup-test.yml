@@ -34,7 +34,7 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: Web-Automatio
-          spec: Web-Automatio/cypress/e2e/homeowner.cy.js
+          spec: cypress/e2e/homeowner.cy.js
           browser: firefox
         env:
           CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
