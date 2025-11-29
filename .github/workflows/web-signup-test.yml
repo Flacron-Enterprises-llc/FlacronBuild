@@ -1,4 +1,4 @@
-name: Updated Homwowner Signup on ff tests
+name: Updated Homeowner Signup on ff tests
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - web-signup-tests   # your branch
 
 jobs:
-  HomwOwner-run:
+  HomeOwner-run:
     runs-on: ubuntu-24.04
 
     steps:
