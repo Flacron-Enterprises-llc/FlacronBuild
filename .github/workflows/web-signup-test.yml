@@ -1,4 +1,4 @@
-name: Updated Homeowner Signup on ff tests
+name: Updated Homeowner Signup on chrome tests
 
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
         with:
           working-directory: Web-Automatio
           spec: cypress/e2e/tests/web-signup-test/homeOwnerSignUpTest.cy.js
-          browser: firefox
+          browser: chrome
         env:
           CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
 
