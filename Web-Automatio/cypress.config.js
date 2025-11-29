@@ -9,7 +9,7 @@ module.exports = defineConfig({
     overwrite: false,
     html: true,
     json: true,                 // Generate JSON report
-    reportDir: "cypress/reports",
+    reportDir: "cypress/reports/html",
     reportFilename: "[name]"+ `report-${new Date().toISOString().replace(/[:.]/g, '-')}`,  
     reportPageTitle: "Test Report",
     embeddedScreenshots: true,
