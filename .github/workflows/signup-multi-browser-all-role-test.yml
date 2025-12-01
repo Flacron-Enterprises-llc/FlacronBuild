@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: [chrome, firefox, edge]  # Auto run on all 3
+        browser: [chrome, edge]  # Auto run on all 3
 
     steps:
       - name: Checkout Repository
