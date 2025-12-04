@@ -29,7 +29,7 @@ jobs:
         uses: cypress-io/github-action@v6
         with:
           working-directory: web-automation
-          command: npm run test:homeowner-login-test
+          command: npm run test:contractor-login-test
         
           
       - name: Upload Report
