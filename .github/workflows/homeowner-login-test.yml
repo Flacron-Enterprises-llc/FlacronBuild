@@ -1,0 +1,39 @@
+name: Homeowner Login Test Build
+
+on:
+  push:
+    branches:
+      - web-login-tests
+
+jobs:
+
+  homeowner-run:
+    name: Homeowner login Test 
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+         node-version: 22
+
+
+      - name: Install Dependencies
+        working-directory: web-automation
+        run: npm install
+
+      - name: Run Homeowner login Test
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          command: npm run test:homeowner-login-test
+        
+          
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: homeowner-login-report
+          path: Web-Automatio/cypress/reports/html
