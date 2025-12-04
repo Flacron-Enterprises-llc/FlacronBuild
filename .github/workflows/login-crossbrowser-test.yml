@@ -13,7 +13,6 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chrome, edge, firefox]  # Run on all 3 browsers
-        containers: [1]  # 1 container per browser
 
     steps:
       # -------------------------------
@@ -49,11 +48,12 @@ jobs:
           browser: ${{ matrix.browser }}
           headed: true
           spec: "**/*.cy.js"
-          record: true           # <-- ENABLE CYPRESS CLOUD
-          parallel: false        # (We’re already splitting by browser)
+          record: true           
+          parallel: false        
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-          TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # -------------------------------
       # UPLOAD MOCHAWESOME REPORTS
       # -------------------------------
