@@ -28,7 +28,7 @@ jobs:
       - name: Run Homeowner login Test
         uses: cypress-io/github-action@v6
         with:
-          working-directory: Web-Automatio
+          working-directory: web-automation
           command: npm run test:homeowner-login-test
         
           
@@ -36,4 +36,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: homeowner-login-report
-          path: Web-Automatio/cypress/reports/html
+          path: web-automation/cypress/reports/html
