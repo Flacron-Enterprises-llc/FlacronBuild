@@ -16,6 +16,10 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with: 
+          record: true
+        env:
+         CYPRESS_RECORD_KEY: a4b817fc-229c-455e-8b61-d3acbab04afa
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
