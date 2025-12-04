@@ -3,13 +3,13 @@ name: Homeowner Login Test Build
 on:
   push:
     branches:
-      - web-login-tests
+      - web-login-test
 
 jobs:
 
   homeowner-run:
     name: Homeowner login Test 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04 
 
     steps:
       - name: Checkout
