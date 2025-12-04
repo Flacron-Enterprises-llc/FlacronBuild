@@ -7,6 +7,7 @@
     "test:contractor-login-test": "npx cypress run --browser chrome  --spec cypress/e2e/tests/login/contractorLoginTest.cy.js ",
     "test:inspector-login-test": "npx cypress run --browser edge  --spec cypress/e2e/tests/login/inspectorLoginTest.cy.js ",
     "test:insuranceAdjuster-login-test": "npx cypress run --browser chrome  --spec cypress/e2e/tests/login/insuranceLoginTest.cy.js ",
+    "cy:cloud": "npx cypress run --record --key a4b817fc-229c-455e-8b61-d3acbab04afa",
     "test": "npx cypress run --record --key cc5ae977-6be8-487f-a91b-75e9dc308d31"
   },
   "repository": {
