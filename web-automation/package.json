@@ -1,0 +1,36 @@
+{
+  "name": "web-automatio",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test:homeowner-login-test": "npx cypress run --browser firefox  --spec cypress/e2e/tests/login/homeOwnerLoginTest.cy.js",
+    "test:contractor-login-test": "npx cypress run --browser chrome  --spec cypress/e2e/tests/login/contractorLoginTest.cy.js ",
+    "test:inspector-login-test": "npx cypress run --browser edge  --spec cypress/e2e/tests/login/inspectorLoginTest.cy.js ",
+    "test:insuranceAdjuster-login-test": "npx cypress run --browser chrome  --spec cypress/e2e/tests/login/insuranceLoginTest.cy.js ",
+    "test": "npx cypress run --record --key cc5ae977-6be8-487f-a91b-75e9dc308d31"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RODRIGUEFOKA/FlacronBuild.git"
+  },
+  "author": "Hina Sarmad",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/RODRIGUEFOKA/FlacronBuild/issues"
+  },
+  "homepage": "https://github.com/RODRIGUEFOKA/FlacronBuild#readme",
+  "description": "",
+  "devDependencies": {
+    "@faker-js/faker": "^10.1.0",
+    "cypress": "^14.5.4",
+    "cypress-mochawesome-reporter": "^4.0.2",
+    "cypress-plugin-stripe-elements": "^1.0.2",
+    "faker": "^5.5.3",
+    "mochawesome": "^7.1.4",
+    "mochawesome-merge": "^5.1.0",
+    "mochawesome-report-generator": "^6.3.2"
+  },
+  "dependencies": {
+    "google-auth-library": "^10.5.0"
+  }
+}
