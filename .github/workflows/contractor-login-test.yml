@@ -1,7 +1,7 @@
 name: Contractor Login Test on Chrome browser Build
 
 on:
-  push:
+  push: 
     branches:
       - web-login-test
 
