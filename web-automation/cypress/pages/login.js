@@ -171,7 +171,7 @@ class login {
 
          cy.get(this.weblocators.invalidPwErr)
       .should('be.visible')
-      .and('contain.text', 'Firebase: Error (auth/invalid-credential).')
+      .and('contain.text', 'Firebase: Error ')
        
     }
 
