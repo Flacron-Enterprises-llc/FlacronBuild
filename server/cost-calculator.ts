@@ -51,33 +51,35 @@ export interface ProjectRequirements {
   [key: string]: any;
 }
 
-interface GeminiResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
+interface OpenAIResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
     };
   }>;
+  error?: {
+    message: string;
+    type: string;
+  };
 }
 
 // Real-time data sources for construction costs
 export class RealCostCalculator {
-  private geminiApiKey: string;
+  private openaiApiKey: string;
 
   constructor() {
-    this.geminiApiKey = process.env.GEMINI_KEY || '';
-    if (!this.geminiApiKey) {
-      console.error('⚠️ CRITICAL: Gemini API key is not set. Set GEMINI_KEY in environment variables.');
+    this.openaiApiKey = process.env.OPENAI_KEY || process.env.OPENAI_API_KEY || '';
+    if (!this.openaiApiKey) {
+      console.error('⚠️ CRITICAL: OpenAI API key is not set. Set OPENAI_KEY or OPENAI_API_KEY in environment variables.');
     } else {
-      console.log('✅ Gemini API key found:', this.geminiApiKey.slice(0, 8) + '...');
+      console.log('✅ OpenAI API key found:', this.openaiApiKey.slice(0, 8) + '...');
     }
   }
 
   async calculateRealCost(project: ProjectRequirements, imageUrls?: string[]): Promise<any> {
-    // Validate Gemini API key first
-    if (!this.geminiApiKey) {
-      throw new Error('Gemini API key is not configured. Please set GEMINI_KEY environment variable.');
+    // Validate OpenAI API key first
+    if (!this.openaiApiKey) {
+      throw new Error('OpenAI API key is not configured. Please set OPENAI_KEY or OPENAI_API_KEY environment variable.');
     }
 
     console.log('=== COST CALCULATOR: Starting Cost Calculation ===');
@@ -183,12 +185,21 @@ export class RealCostCalculator {
         throw new Error(`Failed to build prompt for role ${userRole}: ${promptError instanceof Error ? promptError.message : String(promptError)}`);
       }
 
-      // Build Gemini parts array with text and images
-      const parts: any[] = [{ text: prompt }];
+      // Build OpenAI messages array
+      const messages: any[] = [
+        {
+          role: 'system',
+          content: 'You are a professional roofing cost estimation expert. You must follow all calculation rules exactly and return valid JSON.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ];
       
-      // Process images for Gemini analysis if provided
+      // Process images for OpenAI analysis if provided (OpenAI supports images in messages)
       if (imageUrls && imageUrls.length > 0) {
-        console.log('=== COST CALCULATOR: Adding Images to Gemini Request ===');
+        console.log('=== COST CALCULATOR: Adding Images to OpenAI Request ===');
         for (let i = 0; i < imageUrls.length; i++) {
           const imageUrl = imageUrls[i];
           // Extract base64 string from object or use directly if it's a string
@@ -198,35 +209,40 @@ export class RealCostCalculator {
           if (typeof base64String === 'string') {
             // Remove data:image/jpeg;base64, prefix if present
             const base64Data = base64String.replace(/^data:image\/[a-z]+;base64,/, '');
-            parts.push({
-              inline_data: {
-                mime_type: 'image/jpeg',
-                data: base64Data
-              }
+            messages.push({
+              role: 'user',
+              content: [
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:image/jpeg;base64,${base64Data}`
+                  }
+                }
+              ]
             });
-            console.log(`Added image ${i + 1} to Gemini request (${base64Data.length} chars)`);
+            console.log(`Added image ${i + 1} to OpenAI request (${base64Data.length} chars)`);
           } else {
             console.log(`Skipping image ${i + 1} - not a valid string format`);
           }
         }
       }
 
-      console.log('=== COST CALCULATOR: Calling Gemini API ===');
+      console.log('=== COST CALCULATOR: Calling OpenAI API ===');
       console.log('Request timestamp:', new Date().toISOString());
       const startTime = Date.now();
       
-      const geminiResponse = await this.queryGemini(parts);
+      const openaiResponse = await this.queryOpenAI(messages);
       
       const endTime = Date.now();
-      console.log('=== COST CALCULATOR: Gemini Response Received ===');
+      console.log('=== COST CALCULATOR: OpenAI Response Received ===');
       console.log('Response time:', endTime - startTime, 'ms');
-      console.log('Response length:', geminiResponse.length, 'characters');
-      console.log('Gemini response preview:', geminiResponse.substring(0, 500), '...');
+      console.log('Response length:', openaiResponse.length, 'characters');
+      console.log('OpenAI response preview:', openaiResponse.substring(0, 500), '...');
       
       let reportJson;
       try {
         // Clean up the response - remove markdown code blocks if present
-        let cleanResponse = geminiResponse.trim();
+        let cleanResponse = openaiResponse.trim();
         if (cleanResponse.startsWith('```json')) {
           cleanResponse = cleanResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
         }
@@ -234,7 +250,7 @@ export class RealCostCalculator {
           cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
         }
         
-        // Fix common JSON issues from Gemini
+        // Fix common JSON issues from OpenAI
         // Fix unquoted number ranges like "estimatedDays": 5-8 -> "estimatedDays": "5-8"
         cleanResponse = cleanResponse.replace(/("estimatedDays":\s*)(\d+-\d+)([,\s}])/g, '$1"$2"$3');
         cleanResponse = cleanResponse.replace(/("totalHours":\s*)(\d+\.\d+)([,\s}])/g, '$1$2$3');
@@ -253,8 +269,8 @@ export class RealCostCalculator {
       } catch (e) {
         console.log('=== COST CALCULATOR: JSON Parse Error ===');
         console.log('Parse error:', e);
-        console.log('Raw response causing error:', geminiResponse);
-        throw new Error("Gemini did not return valid JSON: " + geminiResponse);
+        console.log('Raw response causing error:', openaiResponse);
+        throw new Error("OpenAI did not return valid JSON: " + openaiResponse);
       }
       
       // Compose the breakdown and return
@@ -285,7 +301,7 @@ export class RealCostCalculator {
         contingencyCost,
         regionMultiplier: 1.0, // Not used with Gemini
         breakdown: reportJson.breakdown || reportJson,
-        dataSource: 'Gemini API',
+        dataSource: 'OpenAI API',
         timeline: reportJson.timeline || reportJson.laborRequirements?.estimatedDays || 'Not specified',
         contingencySuggestions: reportJson.contingencySuggestions || 'Standard 7% contingency applied',
         report: reportJson,
@@ -307,50 +323,51 @@ export class RealCostCalculator {
       if (error.message.includes('429')) {
         throw new Error('Rate limit exceeded. Please try again in a few minutes.');
       } else if (error.message.includes('401') || error.message.includes('403')) {
-        throw new Error('Invalid Gemini API key. Please check your configuration.');
+        throw new Error('Invalid OpenAI API key. Please check your configuration.');
       } else if (error.message.includes('Failed to fetch')) {
-        throw new Error('Network error while contacting Gemini API. Please check your internet connection.');
+        throw new Error('Network error while contacting OpenAI API. Please check your internet connection.');
       } else {
         throw new Error(`Failed to generate estimate: ${error.message}`);
       }
     }
   }
 
-  private async queryGemini(parts: any[]): Promise<string> {
-    if (!this.geminiApiKey) {
-      throw new Error('Gemini API key is not configured');
+  private async queryOpenAI(messages: any[]): Promise<string> {
+    if (!this.openaiApiKey) {
+      throw new Error('OpenAI API key is not configured');
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`;
+    const url = 'https://api.openai.com/v1/chat/completions';
     
-    console.log('\n=== GEMINI API: Request Details ===');
+    console.log('\n=== OPENAI API: Request Details ===');
     console.log('Timestamp:', new Date().toISOString());
-    console.log('Request parts count:', parts.length);
-    console.log('\n=== Text Content ===');
-    console.log(parts[0].text);
-    
-    if (parts.length > 1) {
-      console.log('\n=== Image Data ===');
-      for (let i = 1; i < parts.length; i++) {
-        console.log(`Image ${i}:`, {
-          type: parts[i].inline_data.mime_type,
-          size: parts[i].inline_data.data.length + ' chars'
-        });
+    console.log('Request messages count:', messages.length);
+    console.log('\n=== System Message ===');
+    console.log(messages[0]?.content);
+    console.log('\n=== User Message Preview ===');
+    const userMessage = messages.find(m => m.role === 'user');
+    if (userMessage) {
+      if (typeof userMessage.content === 'string') {
+        console.log(userMessage.content.substring(0, 500) + '...');
+      } else {
+        console.log('Content type:', typeof userMessage.content);
       }
     }
 
     const requestBody = {
-      contents: [{ parts }]
+      model: 'gpt-4o', // Using GPT-4o for better JSON generation
+      messages: messages,
+      temperature: 0.3, // Lower temperature for more consistent JSON output
+      response_format: { type: 'json_object' } // Force JSON response
     };
 
     console.log('\n=== Request Structure ===');
-    console.log(JSON.stringify(requestBody, (key, value) => {
-      // Don't show the actual image data in logs
-      if (key === 'data' && typeof value === 'string' && value.length > 100) {
-        return value.substring(0, 100) + '... [truncated]';
-      }
-      return value;
-    }, 2));
+    console.log(JSON.stringify({
+      model: requestBody.model,
+      messages_count: messages.length,
+      temperature: requestBody.temperature,
+      response_format: requestBody.response_format
+    }, null, 2));
     
     try {
       console.log('\n=== Making API Request ===');
@@ -358,7 +375,10 @@ export class RealCostCalculator {
       
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.openaiApiKey}`
+        },
         body: JSON.stringify(requestBody)
       });
 
@@ -370,44 +390,49 @@ export class RealCostCalculator {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Gemini API error response:', errorText);
-        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+        console.error('OpenAI API error response:', errorText);
+        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
       }
 
-      const data = await response.json() as GeminiResponse;
+      const data = await response.json() as OpenAIResponse;
       console.log('\n=== Response Data ===');
       if (typeof data === 'object' && data !== null) {
         console.log('Response structure:', Object.keys(data));
       }
       
-      if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        console.error('Unexpected Gemini response structure:', JSON.stringify(data, null, 2));
-        throw new Error('Invalid response format from Gemini API');
+      if (data.error) {
+        console.error('OpenAI API error:', data.error);
+        throw new Error(`OpenAI API error: ${data.error.message}`);
+      }
+      
+      if (!data?.choices?.[0]?.message?.content) {
+        console.error('Unexpected OpenAI response structure:', JSON.stringify(data, null, 2));
+        throw new Error('Invalid response format from OpenAI API');
       }
 
-      const responseText = data.candidates[0].content.parts[0].text;
+      const responseText = data.choices[0].message.content;
       console.log('\n=== Response Text Preview ===');
       console.log(responseText.substring(0, 500) + '...');
 
       return responseText;
     } catch (error: unknown) {
-      console.error('\n=== GEMINI API: Request Failed ===');
+      console.error('\n=== OPENAI API: Request Failed ===');
       if (error instanceof Error) {
         console.error('Error type:', error.constructor.name);
         console.error('Error message:', error.message);
         if (error.message.includes('429')) {
           throw new Error('Rate limit exceeded. Please try again in a few minutes.');
         } else if (error.message.includes('401') || error.message.includes('403')) {
-          throw new Error('Invalid Gemini API key. Please check your configuration.');
+          throw new Error('Invalid OpenAI API key. Please check your configuration.');
         } else if (error.message.includes('Failed to fetch')) {
-          throw new Error('Network error while contacting Gemini API. Please check your internet connection.');
+          throw new Error('Network error while contacting OpenAI API. Please check your internet connection.');
         }
       }
-      throw new Error('Failed to process Gemini API request');
+      throw new Error('Failed to process OpenAI API request');
     }
   }
 
-  private parseGeminiResponse(response: string) {
+  private parseOpenAIResponse(response: string) {
     // Parse the Gemini response for the required fields
     let materialsCost = 0, laborCost = 0, permitsCost = 0, contingencyCost = 0;
     let timeline = '', contingencySuggestions = '', report = '';
@@ -660,16 +685,165 @@ IMPORTANT: Generate the ENTIRE report in ${project.preferredLanguage || 'English
 
 AVAILABLE PROJECT DATA TO USE:
 - Location: ${project.location?.city || 'Not provided'}, ${project.location?.country || 'Not provided'} ${project.location?.zipCode || 'Not provided'}
+- Project Type: ${project.projectType || 'Residential'} (Residential or Commercial - CRITICAL for cost calculation)
 - Structure: ${project.structureType || 'Not provided'}
 - Roof Details: ${project.roofPitch || 'Not provided'} pitch, ${project.roofAge || 'Not provided'} years old
-- Materials: ${project.materialLayers?.join(', ') || 'Not provided'}
+- Materials: ${(project.materials?.layers || project.materialLayers || []).join(', ') || 'Not provided'}
+- Material Layers Count: ${(project.materials?.layers || project.materialLayers || []).length || 1} layer(s)
+- Felt Type: ${project.materials?.feltType || project.felt || '15 lb'}
 - Job Type: ${project.jobType || 'Not provided'}
 - Material Preference: ${project.materialPreference || 'Not provided'}
 - Worker Count: ${project.laborNeeds?.workerCount || 'Not provided'}
 - Steep Assist Needed: ${project.laborNeeds?.steepAssist ? 'Yes' : 'No'}
 - Line Items Selected: ${project.lineItems?.join(', ') || 'Not provided'}
 - Local Permit Required: ${project.localPermit ? 'Yes' : 'No'}
-- Components: Ice Shield: ${project.iceWaterShield ? 'Yes' : 'No'}, Felt: ${project.felt || 'None'}, Drip Edge: ${project.dripEdge ? 'Yes' : 'No'}
+- Components: Ice Shield: ${project.iceWaterShield || project.materials?.extras?.includes('Ice/Water Shield') ? 'Yes' : 'No'}, Felt: ${project.materials?.feltType || project.felt || 'None'}, Drip Edge: ${project.dripEdge || project.materials?.extras?.includes('Drip Edge') ? 'Yes' : 'No'}
+- Extras: ${(project.materials?.extras || []).join(', ') || 'None'}
+- Area: ${project.area || 1200} sq ft
+
+CRITICAL COST CALCULATION RULES - YOU MUST FOLLOW THESE EXACTLY:
+
+1. INPUT VALIDATION (CHECK FIRST - BEFORE ANY CALCULATIONS):
+   - If roofAge is negative (e.g., -5), return: {"error": "Invalid input: roofAge cannot be negative", "message": "Please provide a valid roof age (0 or greater)."}
+   - If workerCount is "0 Workers" or empty/invalid, return: {"error": "Invalid input: workerCount must be at least 1 worker", "message": "Please specify a valid number of workers for the project."}
+   - If area is 0 or negative, return: {"error": "Invalid input: roof area must be greater than 0", "message": "Please provide a valid roof area."}
+   - Do NOT generate estimates for invalid inputs - return error JSON immediately
+
+2. LABOR HOURS CALCULATION (CRITICAL - MUST BE REALISTIC):
+   - Base hours for Full Replace: 40-60 total man-hours (NOT 10 hours!)
+   - For Partial Repair: 8-20 total man-hours (MUST use this range, NOT 40-60!)
+   - Calculate based on worker count:
+     * 1-2 Workers: 40-60 hours total (20-30 hours per worker)
+     * 3-5 Workers: 30-50 hours total (10-17 hours per worker)
+     * 6-9 Workers: 25-40 hours total (4-7 hours per worker)
+     * 10+ Workers: 20-35 hours total (2-4 hours per worker) - but total cost increases due to more workers (rate × hours × 10+ workers)
+   - Adjustments:
+     * Steep roofs (9-12/12): +30-50% more hours (so 52-90 hours for 1-2 workers)
+     * Old roofs (30+ years): +20-40% more hours (brittle materials take longer)
+     * Multiple material layers: +25-50% more hours
+     * Commercial structures: +40-60% more hours
+     * Multi-level structures (3+ stories): +50-80% more hours (safety, chutes, slower work)
+     * Metal/Slate materials: +50-100% more hours (specialized installation)
+   - Example: Full Replace with 1-2 workers on standard roof = 40-60 hours, NOT 10 hours!
+   - CRITICAL: For 10+ workers, calculate: (rate per hour) × (hours per worker) × (number of workers) + supervision ($500-1000)
+
+3. LABOR COST CALCULATION (CRITICAL - MUST BE 40-50% OF TOTAL):
+   - Base hourly rate by location:
+     * Standard areas (Houston, Dallas, etc.): $65-75/hour
+     * High-cost areas (NYC, San Francisco): $100-150/hour (2x multiplier)
+     * Other major cities: $75-100/hour
+   - Rate adjustments:
+     * Steep roofs: +$10-15/hour
+     * Commercial projects: +$15-25/hour
+     * Multi-level structures: +$20-30/hour (hazard pay)
+     * Metal/Slate materials: +$20-40/hour (specialized trades)
+   - Total Labor Cost = (Rate per Hour) × (Total Hours) × (Number of Workers)
+   - CRITICAL: Labor cost MUST be 40-50% of total project cost. If materials are $6,000, labor should be $3,000-$5,000, NOT $650!
+   - For 10+ workers: Calculate total cost = (rate × hours × worker_count), but also add supervision cost ($500-1000)
+   - IMPORTANT: After calculating all costs, verify labor is 40-50% of total. If not, adjust labor rate or hours to meet this requirement.
+
+4. MATERIALS COST CALCULATION:
+   - Detect material type from materials.layers or materialLayers array:
+     * "Asphalt Shingles" or standard shingles: $2.50-$4.00/sq ft (Standard), $3.50-$5.00/sq ft (Premium/Luxury)
+     * "Metal Roofing" or "Metal": $8.00-$15.00/sq ft (premium material, 50+ year life) - for 1200 sq ft = $9,600-$18,000
+     * "Slate" or "Natural Slate": $12.00-$20.00/sq ft (luxury grade, very expensive) - for 1200 sq ft = $14,400-$24,000
+     * "Wood Shakes" or "Cedar Shakes": $7.00-$10.00/sq ft (premium natural material) - for 1200 sq ft = $8,400-$12,000
+     * "Built-up Roofing" or "BUR": $3.00-$8.00/sq ft (commercial, multi-layer)
+   - If materialPreference is "Luxury", apply premium pricing even for standard materials
+   - Multiple layers in materials array = multiple layers to remove (add 50-100% to tear-off cost)
+   - CRITICAL: For Slate luxury material, materials should be $15,000-$25,000 for 1200 sq ft, labor $12,000-$18,000 (specialized, 50-100% more hours)
+   - Underlayment costs:
+     * 15 lb Felt: $0.30-$0.50/sq ft
+     * 30 lb Felt: $0.50-$0.80/sq ft
+     * Synthetic: $0.40-$0.70/sq ft
+   - Extras:
+     * Ice/Water Shield: +$0.50-$0.75/sq ft
+     * Drip Edge: +$2.00-$4.00/linear foot
+     * Hurricane Straps: +$5.00-$15.00 per strap (typically 50-100 straps needed)
+     * High-Wind Shingles: +$1.00-$2.00/sq ft premium
+   - Multiple layers: If removing 2+ layers, add 50-100% to tear-off cost
+   - Location multipliers:
+     * NYC, San Francisco: +50-100% material cost (shipping, local markup)
+     * Other major cities: +20-40%
+     * Standard areas: No multiplier
+
+5. TEAR-OFF / REMOVAL COSTS:
+   - Base: $0.80-$1.50/sq ft for standard single layer
+   - Adjustments:
+     * Multiple layers: +50-100% (double the weight/labor)
+     * Heavy materials (Slate, Metal): +100-200% (slate is very heavy)
+     * Old roofs (30+ years): +20-40% (brittle, takes longer)
+     * Commercial/Multi-level: +50-100% (requires chutes, safety equipment)
+
+6. DEBRIS REMOVAL / DISPOSAL (REQUIRED IF IN LINE ITEMS):
+   - Base: $400-$800 for standard residential
+   - Adjustments:
+     * Heavy materials (Slate, Metal): $1,200-$2,500 (multiple dumpsters)
+     * Multiple layers: $800-$1,600
+     * NYC/Manhattan: $1,800-$2,500 (disposal fees, permits)
+     * Commercial: $1,000-$2,000
+   - MUST be included in equipment section if "Debris Removal" is in lineItems
+
+7. EQUIPMENT COSTS:
+   - Base tools: $300-$500
+   - Safety equipment: $200-$400
+   - Steep assist equipment: +$300-$600 (if steepAssist is true)
+   - Crane rental (NYC, multi-level): $2,500-$4,000
+   - Extra tools for large crews (10+ workers): +$500-$800 (need more harnesses, nail guns, etc.)
+
+8. LINE ITEMS COSTS (Add to appropriate sections - MUST include ALL selected line items):
+   - "Gutters & Downspouts": $2,200-$4,500 (200 linear feet typical) - add to materials or equipment
+   - "Skylight Installation": $2,500-$5,000 per skylight (1-2 typical) - add to materials or equipment
+   - "Deck Repair/Replacement": $1,500-$3,500 (10-20% of roof area typically needs repair) - add to materials
+   - "Structural Reinforcement": $1,000-$2,500 - add to materials
+   - "Permit & Inspection Fees": $150-$1,500 (varies by location - NYC is $1,000-$1,500) - add to equipment
+   - "Ice & Water Shield": Already in materials, but add $600-$900 if specified separately - add to materials
+   - "Drip Edge & Trim": $800-$1,500 if "All Types" specified - add to materials
+   - "Flashing (All Types)": $800-$1,500 (includes complex chimney/valley flashing) - add to materials
+   - CRITICAL: If "LINE ITEMS STRESS" test (all 10 items), total must be $15,750-$26,750. Add ALL line item costs.
+
+9. ROOF AGE IMPACT:
+   - 30+ years old: Add decking repair $800-$2,000 (10-20% wood rot expected)
+   - 30+ years old: Add flashing replacement $400-$700 (rust/brittle)
+   - 30+ years old: Add +20-40% to labor (brittle shingles take longer)
+   - 100 years old (historical): Major decking replacement $3,000-$5,000, specialized craftsmen $10,000-$15,000
+
+10. STRUCTURE TYPE & PROJECT TYPE IMPACT:
+    - If projectType is "Commercial" OR structureType includes "Commercial", "Warehouse", "Industrial":
+      * Labor: +40-60% labor cost, minimum $5,000-$8,000 for skilled "Hot-Roofing" crew
+      * Materials: Use Built-up Roofing (BUR) rates $3.00-$8.00/sq ft, or specialized commercial materials
+      * Equipment: +$2,000-$2,500 (specialized commercial equipment)
+      * Total commercial warehouse: $18,000-$25,000+ (NOT $7,000!)
+      * CRITICAL: Commercial projects MUST have total cost of at least $18,000
+    - Multi-level (3+ stories) or "Multi-Family" or structureType includes "Multi-Family" or "3-Story":
+      * Labor: +50-80% labor cost (height hazard pay, slower production) - minimum $7,000 for 1200 sq ft
+      * Equipment: +$1,500-$2,500 (crane, chutes, OSHA safety systems)
+      * Debris removal: +50-100% (requires chutes, can't drop from height)
+      * CRITICAL: Multi-level structures MUST have labor cost of at least $7,000 and total of at least $14,500
+    - Residential: Standard rates apply (no commercial multiplier)
+
+11. GEOGRAPHIC LOCATION MULTIPLIERS:
+    - NYC (10001, Manhattan): 2x labor, 1.5-2x materials, +$2,500-$4,000 crane, +$1,000-$1,500 permits
+    - San Francisco: 1.8x labor, 1.6x materials
+    - Other major cities: 1.2-1.4x labor, 1.2x materials
+    - Standard areas (Houston, Dallas, etc.): No multiplier
+
+12. JOB TYPE IMPACT:
+    - "Full Replace" or "full-replace": Full costs as calculated above
+    - "Partial Repair" or "partial-repair": 
+      * Materials: $150-$300 (1-2 bundles) - DO NOT use full area calculations
+      * Labor: $600-$1,200 (8-20 hours, 1-2 workers) - DO NOT use 40-60 hours
+      * Equipment: $150-$300 (basic tools) - DO NOT include full debris removal
+      * Total: $1,300-$2,600 - MUST be in this range
+    - CRITICAL: For partial repair, COMPLETELY IGNORE full replacement calculations. Use ONLY the simplified partial repair costs listed above.
+
+13. FINAL VALIDATION:
+    - Labor cost MUST be 40-50% of total project cost
+    - Total hours MUST be realistic (40-60 for full replace with 1-2 workers, NOT 10!)
+    - Debris removal MUST be included if in lineItems
+    - All line items MUST be accounted for in costs
+    - Commercial projects MUST have higher labor costs ($5,000-$8,000 minimum)
+    - Multi-level structures MUST have crane/equipment costs
 
 Generate a detailed contractor report in JSON format with these exact sections:
 
@@ -743,24 +917,27 @@ Generate a detailed contractor report in JSON format with these exact sections:
   },
   "costEstimates": {
     "materials": {
-      "total": ${(project.area || 1200) * (project.materialPreference === 'luxury' ? 8 : project.materialPreference === 'eco' ? 4 : 6)},
+      "total": [CALCULATE based on rules below],
       "breakdown": [
-        {"category": "Roofing Materials", "amount": ${(project.area || 1200) * (project.materialPreference === 'luxury' ? 5 : project.materialPreference === 'eco' ? 2.5 : 3.5)}},
-        {"category": "Underlayment & Accessories", "amount": ${(project.area || 1200) * 1.5}},
-        {"category": "Flashing & Trim", "amount": ${(project.area || 1200) * 1}}
+        {"category": "Roofing Materials", "amount": [CALCULATE based on material type and preference]},
+        {"category": "Underlayment & Accessories", "amount": [CALCULATE based on felt type and area]},
+        {"category": "Flashing & Trim", "amount": [CALCULATE based on line items and complexity]}
       ]
     },
     "labor": {
-      "total": ${(project.area || 1200) * (project.laborNeeds?.steepAssist ? 4 : 3)},
-      "ratePerHour": ${project.laborNeeds?.steepAssist ? 75 : 65},
-      "totalHours": ${(project.area || 1200) / (project.laborNeeds?.steepAssist ? 80 : 100)}
+      "total": [CALCULATE based on rules below - MUST be 40-50% of total project cost],
+      "ratePerHour": [CALCULATE based on location, roof pitch, and material complexity],
+      "totalHours": [CALCULATE based on rules below - MUST be realistic for job type]
     },
     "equipment": {
-      "total": ${project.laborNeeds?.steepAssist ? 800 : 500},
+      "total": [CALCULATE based on rules below],
       "items": [
-        {"item": "Tool rental and equipment", "cost": ${project.laborNeeds?.steepAssist ? 500 : 300}},
-        {"item": "Safety equipment", "cost": 200}
-        ${project.laborNeeds?.steepAssist ? ',{"item": "Steep assist equipment", "cost": 300}' : ''}
+        {"item": "Tool rental and equipment", "cost": [CALCULATE]},
+        {"item": "Safety equipment", "cost": [CALCULATE]},
+        {"item": "Debris Removal / Dumpster", "cost": [CALCULATE - REQUIRED if lineItems includes Debris Removal]},
+        {"item": "Steep assist equipment", "cost": [CALCULATE if steepAssist is true]},
+        {"item": "Crane Rental", "cost": [CALCULATE if lineItems includes Crane Rental or structure is multi-level]},
+        {"item": "Permit & Inspection Fees", "cost": [CALCULATE if lineItems includes Permit & Inspection Fees or localPermit is true]}
       ]
     }
   },
@@ -769,7 +946,29 @@ Generate a detailed contractor report in JSON format with these exact sections:
   ]
 }
 
-Use ONLY the actual project data provided above. Do not invent values. Return pure JSON with no markdown formatting.
+CRITICAL: Replace ALL [CALCULATE] placeholders with actual calculated numeric values based on the rules above. Do NOT leave placeholders in the JSON.
+
+IMPORTANT JSON FORMAT REQUIREMENTS:
+- You MUST return valid JSON only (no markdown, no code blocks)
+- All numeric values must be actual numbers, not strings or placeholders
+- All [CALCULATE] placeholders MUST be replaced with real calculated values
+- The JSON structure must match exactly as specified below
+- Use double quotes for all strings
+- Do not include any explanatory text outside the JSON
+
+COST CALCULATION SUMMARY - Apply these in order:
+1. Calculate base material costs based on material type, area, and location
+2. Calculate base labor hours (40-60 for full replace with 1-2 workers, adjust for job type and complexity)
+3. Calculate labor rate based on location, roof pitch, and material complexity
+4. Calculate total labor cost = rate × hours × workers (MUST be 40-50% of total)
+5. Calculate equipment costs including debris removal if in lineItems
+6. Add line items costs (gutters, skylights, permits, etc.)
+7. Add roof age adjustments (decking, flashing, extra labor)
+8. Add structure type adjustments (commercial, multi-level)
+9. Apply geographic multipliers
+10. Validate: Labor should be 40-50% of total, hours should be realistic
+
+Use ONLY the actual project data provided above. Calculate all costs using the detailed rules provided. Return pure JSON with no markdown formatting.
 
 IMPORTANT IMAGE ANALYSIS REQUIREMENTS:
 1. Analyze ONLY the actual uploaded images
@@ -777,7 +976,9 @@ IMPORTANT IMAGE ANALYSIS REQUIREMENTS:
 3. The imageAnalysis array MUST have one string per image, in the same order as uploaded, and no extra or missing entries
 4. Do NOT invent or assume details not visible in the images
 
-Generate a detailed, contractor-focused report using ALL provided details. Return ONLY the JSON object with no markdown formatting - pure JSON starting with {.`;
+Generate a detailed, contractor-focused report using ALL provided details. 
+
+CRITICAL: Return ONLY valid JSON. Do NOT include markdown code blocks. Do NOT include any text before or after the JSON. Start directly with { and end with }. All [CALCULATE] placeholders must be replaced with actual numeric values.`;
 
       case "homeowner":
         return `You are a friendly roofing expert helping a homeowner understand their roof's condition. Create a comprehensive but easy-to-understand homeowner report using ALL the provided project data.
