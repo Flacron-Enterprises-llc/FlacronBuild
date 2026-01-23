@@ -111,7 +111,7 @@ export class MemStorage implements IStorage {
     console.log('Insert estimate data:', insertEstimate);
     console.log('Estimate report data:', insertEstimate.report);
     console.log('Estimate formInputData:', insertEstimate.formInputData);
-    console.log('Estimate geminiResponse:', insertEstimate.geminiResponse);
+    console.log('Estimate openaiResponse:', insertEstimate.openaiResponse);
     
     const id = this.currentEstimateId++;
     const estimate: Estimate = {
@@ -125,7 +125,7 @@ export class MemStorage implements IStorage {
       regionMultiplier: insertEstimate.regionMultiplier || "1.0",
       report: insertEstimate.report || null,
       formInputData: insertEstimate.formInputData || null,
-      geminiResponse: insertEstimate.geminiResponse || null,
+      openaiResponse: insertEstimate.openaiResponse || null,
       createdAt: new Date()
     } as Estimate;
     
@@ -133,7 +133,7 @@ export class MemStorage implements IStorage {
     console.log('=== STORAGE: Estimate Created Successfully ===');
     console.log('Final estimate object:', estimate);
     console.log('Stored formInputData size:', JSON.stringify(estimate.formInputData || {}).length);
-    console.log('Stored geminiResponse size:', JSON.stringify(estimate.geminiResponse || {}).length);
+    console.log('Stored openaiResponse size:', JSON.stringify(estimate.openaiResponse || {}).length);
     return estimate;
   }
 
@@ -143,7 +143,7 @@ export class MemStorage implements IStorage {
     console.log('Retrieved estimate:', estimate);
     if (estimate) {
       console.log('Estimate has formInputData:', !!estimate.formInputData);
-      console.log('Estimate has geminiResponse:', !!estimate.geminiResponse);
+      console.log('Estimate has openaiResponse:', !!estimate.openaiResponse);
       console.log('Estimate has report:', !!estimate.report);
     }
     return estimate;
@@ -166,7 +166,7 @@ export class MemStorage implements IStorage {
     if (latest) {
       console.log('Latest estimate has all data:', {
         hasFormInputData: !!latest.formInputData,
-        hasGeminiResponse: !!latest.geminiResponse,
+        hasOpenaiResponse: !!latest.openaiResponse,
         hasReport: !!latest.report
       });
     }

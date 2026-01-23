@@ -142,7 +142,7 @@ function ConditionalField({ label, value, formatter }: { label: string; value: a
 // Component to render a single project report in the desired format
 function ProjectReportCard({ report, currentUser }: { report: any; currentUser: any }) {
   const project = report.projectData || {};
-  const costData = report.geminiResponse?.costBreakdown || {};
+  const costData = report.openaiResponse?.costBreakdown || {};
   const recommendation = generateRecommendation(project, costData);
   
   // Get homeowner info with fallbacks

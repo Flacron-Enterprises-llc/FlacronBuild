@@ -255,7 +255,7 @@ export default function UserDashboardPage() {
                           <span className="text-neutral-700 text-xs">
                             Role: {project.userRole || 'Not specified'}
                           </span>
-                          {report.geminiResponse && (
+                          {report.openaiResponse && (
                             <span className="text-green-600 text-xs font-medium">✓ AI Analysis Complete</span>
                           )}
                           {report.pdfRef && (

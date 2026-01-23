@@ -109,9 +109,9 @@ export default function ReportDetailPage() {
   if (!report) return <div className="p-8 text-center text-neutral-500">Report not found.</div>;
 
   const project = report.projectData || {};
-  const gemini = report.geminiResponse || {};
+  const openai = report.openaiResponse || {};
   const formInput = report.formInputData || project;
-  const ai = gemini.response?.report || gemini.report || gemini || {};
+  const ai = openai.response?.report || openai.report || openai || {};
 
   // Get homeowner info with fallbacks
   const homeownerName = formInput.homeownerInfo?.name || 

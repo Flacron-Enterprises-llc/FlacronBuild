@@ -27,7 +27,7 @@ export async function getUserPDFs() {
         fileName: `Report_${doc.id}.pdf`,
         timestamp: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
         projectData: data.projectData,
-        geminiResponse: data.geminiResponse,
+        openaiResponse: data.openaiResponse,
         pdfRef: data.pdfRef
       };
     });

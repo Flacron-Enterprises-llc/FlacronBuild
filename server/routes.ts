@@ -201,9 +201,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Use real cost calculator with images
-      console.log('=== BACKEND: Calling Gemini API ===');
+      console.log('=== BACKEND: Calling OpenAI API ===');
       const realEstimate = await realCostCalculator.calculateRealCost(projectRequirements, images);
-      console.log('=== BACKEND: Gemini API Response Received ===');
+      console.log('=== BACKEND: OpenAI API Response Received ===');
       console.log('Estimate total cost:', realEstimate.totalCost);
       console.log('Estimate materials cost:', realEstimate.materialsCost);
       console.log('Estimate labor cost:', realEstimate.laborCost);
@@ -213,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Estimate has report:', !!realEstimate.report);
       console.log('Estimate has imageAnalysis:', !!realEstimate.imageAnalysis);
       
-      // Debug: Log the report structure to see what Gemini returned
+      // Debug: Log the report structure to see what OpenAI returned
       if (realEstimate.report) {
         console.log('=== BACKEND: Report Keys ===');
         const reportObj = realEstimate.report as any; // Cast to any for debugging
@@ -232,7 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageCount: images.length
       };
       
-      const geminiResponseForStorage = {
+      const openaiResponseForStorage = {
         response: realEstimate,
         metadata: {
           apiCallTime: new Date().toISOString(),
@@ -245,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate that data can be serialized to JSON
       try {
         JSON.stringify(formInputDataForStorage);
-        JSON.stringify(geminiResponseForStorage);
+        JSON.stringify(openaiResponseForStorage);
         JSON.stringify(realEstimate.report);
       } catch (serializationError) {
         console.error('=== BACKEND: JSON Serialization Error ===');
@@ -254,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log('Form input data size:', JSON.stringify(formInputDataForStorage).length, 'characters');
-      console.log('Gemini response size:', JSON.stringify(geminiResponseForStorage).length, 'characters');
+      console.log('OpenAI response size:', JSON.stringify(openaiResponseForStorage).length, 'characters');
       
       // Validate estimate data before creating
       if (typeof realEstimate.totalCost !== 'number' && realEstimate.totalCost !== undefined) {
@@ -273,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         regionMultiplier: (realEstimate.regionMultiplier || 1.0).toString(),
         report: realEstimate.report,
         formInputData: formInputDataForStorage,
-        geminiResponse: geminiResponseForStorage
+        openaiResponse: openaiResponseForStorage
       };
       
       // Validate against schema
@@ -293,7 +293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('=== BACKEND: Estimate Created Successfully ===');
       console.log('Saved estimate ID:', savedEstimate.id);
       console.log('Saved estimate has formInputData:', !!savedEstimate.formInputData);
-      console.log('Saved estimate has geminiResponse:', !!savedEstimate.geminiResponse);
+      console.log('Saved estimate has openaiResponse:', !!savedEstimate.openaiResponse);
 
       // Include detailed breakdown in response
       const responseData = {
@@ -458,7 +458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Chatbot endpoint using Gemini API
+  // Chatbot endpoint using IBM Watsonx AI for text generation
   app.post("/api/chatbot", async (req, res) => {
     try {
       const { message, conversationHistory } = req.body;
@@ -467,8 +467,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Message is required" });
       }
 
-      // Check if Gemini API key is available
-      if (!process.env.GEMINI_API_KEY) {
+      // Check if IBM Watsonx AI API key is available
+      const watsonxApiKey = process.env.IBM_WATSONX_AI_API_KEY;
+      const watsonxUrl = process.env.IBM_WATSONX_AI_URL || 'https://us-south.ml.cloud.ibm.com';
+      const watsonxProjectId = process.env.IBM_WATSONX_AI_PROJECT_ID; // Optional - only required for standard deployments
+      const watsonxModelId = process.env.IBM_WATSONX_AI_MODEL_ID || 'ibm/granite-8b-code-instruct';
+      
+      if (!watsonxApiKey) {
         // Fallback responses when API key is not available
         const fallbackResponses = {
           'role': {
@@ -552,11 +557,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Import Gemini API
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      // Helper function to get IBM IAM Bearer token
+      async function getWatsonxToken(apiKey: string): Promise<string> {
+        const fetch = (await import('node-fetch')).default;
+        const tokenResponse = await fetch('https://iam.cloud.ibm.com/identity/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `grant_type=urn:ibm:params:oauth:grant-type:apikey&apikey=${encodeURIComponent(apiKey)}`
+        });
+
+        if (!tokenResponse.ok) {
+          const errorText = await tokenResponse.text();
+          throw new Error(`IBM IAM token error: ${tokenResponse.status} - ${errorText}`);
+        }
+
+        const tokenData = await tokenResponse.json() as any;
+        if (!tokenData.access_token) {
+          throw new Error('Failed to get IBM IAM access token');
+        }
+
+        return tokenData.access_token;
+      }
+
+      // Get Bearer token from IBM IAM
+      const accessToken = await getWatsonxToken(watsonxApiKey);
 
       // Build conversation context
       const systemPrompt = `You are FlacronBuild's AI assistant, a helpful and knowledgeable guide for our roofing estimation platform. 
@@ -603,40 +629,80 @@ Your role is to help users with:
 
 Be friendly, helpful, and concise. Provide relevant suggestions for follow-up questions. Write responses naturally without markdown formatting.`;
 
-      // Build conversation history
-      const conversation = [
-        { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "I understand. I'm ready to help users with role selection, pricing, features, and step-by-step guidance for FlacronBuild." }] }
-      ];
+      // Build conversation history for Watsonx
+      let conversationText = systemPrompt + "\n\nAssistant: I understand. I'm ready to help users with role selection, pricing, features, and step-by-step guidance for FlacronBuild.\n\n";
 
       // Add conversation history
       if (conversationHistory && conversationHistory.length > 0) {
         conversationHistory.forEach((msg: any) => {
-          conversation.push({
-            role: msg.role,
-            parts: [{ text: msg.content }]
-          });
+          const roleLabel = msg.role === 'user' ? 'User' : 'Assistant';
+          conversationText += `${roleLabel}: ${msg.content}\n\n`;
         });
       }
 
       // Add current message
-      conversation.push({
-        role: "user",
-        parts: [{ text: message }]
-      });
+      conversationText += `User: ${message}\n\nAssistant:`;
 
-      // Generate response
-      const result = await model.generateContent({
-        contents: conversation,
-        generationConfig: {
+      // Generate response using IBM Watsonx AI
+      const fetch = (await import('node-fetch')).default;
+      const watsonxEndpoint = `${watsonxUrl}/ml/v1/text/generation?version=2024-11-19`;
+      
+      // Build request body - project_id is optional (required for standard deployments, optional for lightweight engine)
+      const requestBody: any = {
+        input: conversationText,
+        model_id: watsonxModelId,
+        parameters: {
+          max_new_tokens: 1024,
           temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
+          top_p: 0.95,
+          top_k: 40
+        }
+      };
+      
+      // Only include project_id if provided (required for most deployments)
+      if (watsonxProjectId) {
+        requestBody.project_id = watsonxProjectId;
+      }
+      
+      const watsonxResponse = await fetch(watsonxEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
         },
+        body: JSON.stringify(requestBody)
       });
 
-      const response = result.response.text();
+      if (!watsonxResponse.ok) {
+        const errorText = await watsonxResponse.text();
+        let errorMessage = `IBM Watsonx AI API error: ${watsonxResponse.status} - ${errorText}`;
+        
+        // Provide helpful message if project_id is missing
+        if (errorText.includes('project_id') || errorText.includes('project') || errorText.includes('Project')) {
+          errorMessage += '\n\n💡 Tip: You may need to set IBM_WATSONX_AI_PROJECT_ID in your .env file. See IBM_WATSONX_SETUP.md for instructions.';
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const watsonxData = await watsonxResponse.json() as any;
+      
+      if (watsonxData.errors && watsonxData.errors.length > 0) {
+        let errorMessage = watsonxData.errors[0].message || JSON.stringify(watsonxData.errors);
+        
+        // Provide helpful message if project_id is missing
+        if (errorMessage.includes('project_id') || errorMessage.includes('project') || errorMessage.includes('Project')) {
+          errorMessage += '\n\n💡 Tip: You may need to set IBM_WATSONX_AI_PROJECT_ID in your .env file. See IBM_WATSONX_SETUP.md for instructions.';
+        }
+        
+        throw new Error(`IBM Watsonx AI error: ${errorMessage}`);
+      }
+
+      if (!watsonxData.results || !watsonxData.results[0] || !watsonxData.results[0].generated_text) {
+        throw new Error('Invalid response format from IBM Watsonx AI API');
+      }
+
+      const responseText = watsonxData.results[0].generated_text.trim();
 
       // Parse response for actions
       let action = null;
@@ -644,48 +710,48 @@ Be friendly, helpful, and concise. Provide relevant suggestions for follow-up qu
       let suggestions = [];
 
       // Check for role selection
-      if (response.includes('action: "select_role"')) {
+      if (responseText.includes('action: "select_role"')) {
         action = 'select_role';
-        const roleMatch = response.match(/role: "([^"]+)"/);
+        const roleMatch = responseText.match(/role: "([^"]+)"/);
         if (roleMatch) {
           role = roleMatch[1];
         }
-      } else if (response.includes('action: "navigate_pricing"')) {
+      } else if (responseText.includes('action: "navigate_pricing"')) {
         action = 'navigate_pricing';
-      } else if (response.includes('action: "navigate_support"')) {
+      } else if (responseText.includes('action: "navigate_support"')) {
         action = 'navigate_support';
       }
 
       // Generate suggestions based on context
-      if (response.toLowerCase().includes('role') || response.toLowerCase().includes('choose')) {
+      if (responseText.toLowerCase().includes('role') || responseText.toLowerCase().includes('choose')) {
         suggestions = [
           "I want to be a Homeowner",
           "I want to be a Contractor", 
           "I want to be an Inspector",
           "I want to be an Insurance Adjuster"
         ];
-      } else if (response.toLowerCase().includes('pricing') || response.toLowerCase().includes('cost')) {
+      } else if (responseText.toLowerCase().includes('pricing') || responseText.toLowerCase().includes('cost')) {
         suggestions = [
           "Yes, I want to see pricing details",
           "No, tell me about features instead",
           "Can I change plans later?",
           "Is there a free trial?"
         ];
-      } else if (response.toLowerCase().includes('how') || response.toLowerCase().includes('work')) {
+      } else if (responseText.toLowerCase().includes('how') || responseText.toLowerCase().includes('work')) {
         suggestions = [
           "Yes, I need a step-by-step guide",
           "No, tell me what information I need",
           "How accurate are the estimates?",
           "Can I save my projects?"
         ];
-      } else if (response.toLowerCase().includes('certification') || response.toLowerCase().includes('certified')) {
+      } else if (responseText.toLowerCase().includes('certification') || responseText.toLowerCase().includes('certified')) {
         suggestions = [
           "Yes, I need certification",
           "No, I don't need certification",
           "Tell me about training",
           "What certifications are available?"
         ];
-      } else if (response.toLowerCase().includes('feature') || response.toLowerCase().includes('include')) {
+      } else if (responseText.toLowerCase().includes('feature') || responseText.toLowerCase().includes('include')) {
         suggestions = [
           "Yes, I need detailed features",
           "No, tell me about pricing instead",
@@ -702,7 +768,7 @@ Be friendly, helpful, and concise. Provide relevant suggestions for follow-up qu
       }
 
       // Clean response (remove action markers and markdown syntax)
-      const cleanResponse = response
+      const cleanResponse = responseText
         .replace(/action: "[^"]*"/g, '')
         .replace(/role: "[^"]*"/g, '')
         .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown

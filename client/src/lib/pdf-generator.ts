@@ -1188,7 +1188,7 @@ function addInsuranceReport(doc: jsPDF, project: any, estimate: any) {
   console.log('Report:', estimate?.report);
   console.log('Language:', preferredLanguage);
   
-  // Extract report data - handle both direct form data and Gemini response
+  // Extract report data - handle both direct form data and OpenAI response
   const report = estimate?.report || {};
   const claimMetadata = report.claimMetadata || {
     claimNumber: project.claimNumber || 'Not provided',
@@ -1613,7 +1613,7 @@ function addContractorReport(doc: jsPDF, project: any, estimate: any) {
   // Extract report data with fallbacks to form data
   const report = (estimate?.report || {}) as ContractorReport;
   
-  // Use form data as primary source, Gemini data as enhancement
+  // Use form data as primary source, OpenAI data as enhancement
   const projectDetails = {
     address: `${project.location?.city || ''}, ${project.location?.country || ''} ${project.location?.zipCode || ''}`.trim() || 'Not specified',
     type: project.projectType || 'Not specified',
@@ -1624,7 +1624,7 @@ function addContractorReport(doc: jsPDF, project: any, estimate: any) {
     }
   };
 
-  // Use Gemini scope of work if available, otherwise create from form data
+  // Use OpenAI scope of work if available, otherwise create from form data
   const scopeOfWork = report.scopeOfWork || {
     preparationTasks: [
       'Site assessment and safety setup',
@@ -1669,7 +1669,7 @@ function addContractorReport(doc: jsPDF, project: any, estimate: any) {
     return defaultValue;
   };
 
-  // Use form data for labor requirements with Gemini enhancements
+  // Use form data for labor requirements with OpenAI enhancements
   const laborRequirements = {
     crewSize: project.laborNeeds?.workerCount || report.laborRequirements?.crewSize || '3-5',
     estimatedDays: report.laborRequirements?.estimatedDays || (project.jobType === 'full-replace' ? '5-8' : '2-4'),
@@ -1704,7 +1704,7 @@ function addContractorReport(doc: jsPDF, project: any, estimate: any) {
       notes: 'Based on project specifications'
     })) || []);
 
-  // Use Gemini cost estimates if available, otherwise calculate from form data
+  // Use OpenAI cost estimates if available, otherwise calculate from form data
   const costEstimates = report.costEstimates ? {
     ...report.costEstimates,
     labor: {
@@ -2111,7 +2111,7 @@ function addContractorImagePages(doc: jsPDF, uploadedFiles: any[], report?: any,
       }
     }
 
-    // Add image analysis from Gemini if available
+    // Add image analysis from OpenAI if available
     const imageAnalysis = report?.imageAnalysis?.[index] || report?.imageAnalysis || 
       'Professional analysis: This image shows roofing conditions requiring contractor assessment for repair planning and material requirements.';
     
@@ -2502,7 +2502,7 @@ function addHomeownerReport(doc: jsPDF, project: any, estimate: any) {
     yPos = 20;
   }
 
-  // Helper to extract numeric value from formatted currency string (if Gemini returns formatted strings)
+  // Helper to extract numeric value from formatted currency string (if OpenAI returns formatted strings)
   const parseCurrencyValue = (value: string | number): number => {
     if (typeof value === 'number') return value;
     // Remove currency symbols, commas, and spaces, then parse
@@ -2511,8 +2511,8 @@ function addHomeownerReport(doc: jsPDF, project: any, estimate: any) {
     return isNaN(num) ? 0 : num;
   };
 
-  // If Gemini returned budgetGuidance, check if values need conversion
-  // Gemini should return values in preferredCurrency, but if they're strings with USD symbols, parse and convert
+  // If OpenAI returned budgetGuidance, check if values need conversion
+  // OpenAI should return values in preferredCurrency, but if they're strings with USD symbols, parse and convert
   let budgetGuidanceData = report.budgetGuidance;
   if (budgetGuidanceData && preferredCurrency !== 'USD') {
     // Check if values appear to be in USD (have $ symbol) and need conversion
@@ -2766,7 +2766,7 @@ export async function generatePDFReport(project: any, estimate: any, options?: {
   console.log('Estimate object passed in:', estimate);
   console.log('Estimate.report specifically:', estimate?.report);
   console.log('Estimate.formInputData:', estimate?.formInputData);
-  console.log('Estimate.geminiResponse:', estimate?.geminiResponse);
+  console.log('Estimate.openaiResponse:', estimate?.openaiResponse);
   console.log('Options:', options);
   
   // Debug the stored data structures
@@ -2784,13 +2784,13 @@ export async function generatePDFReport(project: any, estimate: any, options?: {
     console.log('No form input data found in estimate');
   }
   
-  if (estimate?.geminiResponse) {
-    console.log('Gemini response keys:', Object.keys(estimate.geminiResponse));
-    console.log('Gemini response size:', JSON.stringify(estimate.geminiResponse).length, 'characters');
-    console.log('Gemini response metadata:', estimate.geminiResponse.metadata);
-    console.log('Gemini response has actual response:', !!estimate.geminiResponse.response);
+  if (estimate?.openaiResponse) {
+    console.log('OpenAI response keys:', Object.keys(estimate.openaiResponse));
+    console.log('OpenAI response size:', JSON.stringify(estimate.openaiResponse).length, 'characters');
+    console.log('OpenAI response metadata:', estimate.openaiResponse.metadata);
+    console.log('OpenAI response has actual response:', !!estimate.openaiResponse.response);
   } else {
-    console.log('No Gemini response data found in estimate');
+    console.log('No OpenAI response data found in estimate');
   }
   
   const doc = new jsPDF();
@@ -2867,7 +2867,7 @@ export async function generatePDFReport(project: any, estimate: any, options?: {
       uploadedBy: options?.username || 'anonymous'
     },
     formInputData: estimate?.formInputData || null,
-    geminiResponse: estimate?.geminiResponse || null,
+    openaiResponse: estimate?.openaiResponse || null,
     project: {
       id: project.id || null,
       name: project.name || null,
@@ -2889,7 +2889,7 @@ export async function generatePDFReport(project: any, estimate: any, options?: {
   console.log('Structured data keys:', Object.keys(structuredData));
   console.log('Structured data size:', JSON.stringify(structuredData).length, 'characters');
   console.log('Has form input data:', !!structuredData.formInputData);
-  console.log('Has Gemini response:', !!structuredData.geminiResponse);
+  console.log('Has OpenAI response:', !!structuredData.openaiResponse);
 
   // Save structured data to Firebase
   try {

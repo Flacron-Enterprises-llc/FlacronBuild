@@ -347,13 +347,13 @@ function sanitizeForFirebase(obj: any): any {
   return obj;
 }
 
-// Helper to save report to Firestore (input data, Gemini JSON, PDF ref)
+// Helper to save report to Firestore (input data, OpenAI JSON, PDF ref)
 async function saveReportToFirestore(project: any, estimate: any, pdfDocId: string) {
   const user = auth.currentUser;
   
   // Sanitize project data to remove undefined values
   const sanitizedProjectData = sanitizeForFirebase(project);
-  const sanitizedGeminiResponse = sanitizeForFirebase(estimate?.report || null);
+  const sanitizedOpenaiResponse = sanitizeForFirebase(estimate?.report || null);
   
   console.log('=== ESTIMATION FORM: Saving Report to Firestore ===');
   console.log('Original project data size:', JSON.stringify(project).length);
@@ -366,7 +366,7 @@ async function saveReportToFirestore(project: any, estimate: any, pdfDocId: stri
     userEmail: user ? user.email : null,
     createdAt: serverTimestamp(),
     projectData: sanitizedProjectData,
-    geminiResponse: sanitizedGeminiResponse,
+    openaiResponse: sanitizedOpenaiResponse,
     pdfRef: pdfDocId,
   });
 }
@@ -750,7 +750,7 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
       
       // Auto-generate and download PDF
       try {
-        console.log('🚀 Auto-generating PDF after Gemini response...');
+        console.log('🚀 Auto-generating PDF after OpenAI response...');
         const { generatePDFReport } = await import('../lib/pdf-generator');
         const projectData = form.getValues();
         
@@ -785,7 +785,7 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
             }
           });
           pdfDocId = pdfDocRef.id;
-          // Save report to Firestore (input, Gemini JSON, PDF ref)
+          // Save report to Firestore (input, OpenAI JSON, PDF ref)
           await saveReportToFirestore(projectData, estimate, pdfDocId);
 
           if (onReportSaved) {
