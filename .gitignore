@@ -32,3 +32,6 @@ server/public
 # Vite
 vite.config.ts.*
 *.tar.gz
+
+# Test outputs
+generated-reports/

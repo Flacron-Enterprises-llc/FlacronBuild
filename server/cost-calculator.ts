@@ -84,7 +84,7 @@ export class RealCostCalculator {
     this.watsonxUrl = process.env.IBM_WATSONX_AI_URL || 'https://us-south.ml.cloud.ibm.com';
     this.watsonxProjectId = process.env.IBM_WATSONX_AI_PROJECT_ID;
     this.watsonxSpaceId = process.env.IBM_WATSONX_AI_SPACE_ID;
-    this.watsonxModelId = process.env.IBM_WATSONX_AI_MODEL_ID || 'ibm/granite-8b-code-instruct';
+    this.watsonxModelId = process.env.IBM_WATSONX_AI_MODEL_ID || 'ibm/granite-4-h-small';
     
     if (!this.watsonxApiKey) {
       console.error('⚠️ CRITICAL: IBM Watsonx API key is not set. Set IBM_WATSONX_AI_API_KEY in environment variables.');
@@ -658,16 +658,21 @@ export class RealCostCalculator {
 
     try {
       const accessToken = await getWatsonxToken(this.watsonxApiKey);
-      const watsonxEndpoint = `${this.watsonxUrl}/ml/v1/text/generation?version=2024-11-19`;
+      // Use chat API instead of legacy text generation API for better compatibility
+      const watsonxEndpoint = `${this.watsonxUrl}/ml/v1/text/chat?version=2024-11-19`;
       
       const requestBody: any = {
-        input: prompt,
         model_id: this.watsonxModelId,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
         parameters: {
           max_new_tokens: 2048,
-          temperature: 0.3,
-          top_p: 0.9,
-          top_k: 40
+          temperature: 0.2,
+          top_p: 0.9
         }
       };
       
@@ -705,13 +710,6 @@ export class RealCostCalculator {
       
       console.log('\n=== IBM Watsonx Response Data Structure ===');
       console.log('Response keys:', Object.keys(data));
-      if (data.results) {
-        console.log('Results count:', data.results.length);
-        if (data.results[0]) {
-          console.log('First result keys:', Object.keys(data.results[0]));
-          console.log('Generated text preview:', String(data.results[0].generated_text || '').substring(0, 200));
-        }
-      }
       
       if (data.errors && data.errors.length > 0) {
         const errorMessage = data.errors[0].message || JSON.stringify(data.errors);
@@ -719,11 +717,36 @@ export class RealCostCalculator {
         throw new Error(`IBM Watsonx AI error: ${errorMessage}`);
       }
 
-      // Check for response structure - handle both possible formats
+      // Handle chat API format (preferred) and legacy text generation format
       let responseText: string | null = null;
       
-      if (data.results && data.results[0]) {
+      // Chat API format: data.choices[0].message.content (top-level choices)
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        responseText = data.choices[0].message.content || null;
+        console.log('Using chat API format (top-level choices)');
+      }
+      // Chat API format: data.results[0].choices[0].message.content (nested in results)
+      else if (data.results && data.results[0] && data.results[0].choices && data.results[0].choices[0]) {
+        responseText = data.results[0].choices[0].message?.content || null;
+        console.log('Using chat API format (nested in results)');
+      }
+      // Legacy text generation format: data.results[0].generated_text
+      else if (data.results && data.results[0]) {
         responseText = data.results[0].generated_text || data.results[0].text || null;
+        console.log('Using legacy text generation format');
+      }
+      
+      // Log response structure details
+      if (data.choices && data.choices[0]) {
+        console.log('Chat API - choices[0] keys:', Object.keys(data.choices[0]));
+        if (responseText) {
+          console.log('Generated text preview:', String(responseText).substring(0, 200));
+        }
+      } else if (data.results && data.results[0]) {
+        console.log('First result keys:', Object.keys(data.results[0]));
+        if (responseText) {
+          console.log('Generated text preview:', String(responseText).substring(0, 200));
+        }
       }
       
       // Handle empty response - Watsonx model may return empty string

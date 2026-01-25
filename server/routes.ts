@@ -471,7 +471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const watsonxApiKey = process.env.IBM_WATSONX_AI_API_KEY;
       const watsonxUrl = process.env.IBM_WATSONX_AI_URL || 'https://us-south.ml.cloud.ibm.com';
       const watsonxProjectId = process.env.IBM_WATSONX_AI_PROJECT_ID; // Optional - only required for standard deployments
-      const watsonxModelId = process.env.IBM_WATSONX_AI_MODEL_ID || 'ibm/granite-8b-code-instruct';
+      const watsonxModelId = process.env.IBM_WATSONX_AI_MODEL_ID || 'ibm/granite-4-h-small';
       
       if (!watsonxApiKey) {
         // Fallback responses when API key is not available
