@@ -16,7 +16,6 @@ import ReportDetailPage from "@/pages/report/[id]";
 import SuccessPage from "@/pages/success";
 import CancelPage from "@/pages/cancel";
 import SupportPage from "@/pages/support";
-import TestInspectorPdfPage from "@/pages/test-inspector-pdf";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
 import TermsPage from "@/pages/terms";
 import CookiePolicyPage from "@/pages/cookie-policy";
@@ -59,7 +58,6 @@ function Router() {
       <Route path="/success" component={SuccessPage} />
       <Route path="/cancel" component={CancelPage} />
       <Route path="/support" component={SupportPage} />
-      <Route path="/test-inspector-pdf" component={TestInspectorPdfPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/cookies" component={CookiePolicyPage} />
