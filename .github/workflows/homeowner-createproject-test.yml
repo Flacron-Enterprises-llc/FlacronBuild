@@ -1,0 +1,32 @@
+name: Homeowner Create Project test on Chrome browser
+on:
+  push:
+    branches:
+      - web-createproject-test
+
+jobs:
+  project-run:
+    name: Test create project on Chrome browser
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run create project Test
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: web-automation
+          # 1. Add the browser flag to your custom command
+          command: npm run test:homeowner-createProject-test -- --record --browser chrome
+          # 2. Specify the browser for the GitHub Action
+          browser: chrome
+          record: true
+        env:
+          CYPRESS_RECORD_KEY: f84cd963-d926-4c10-af50-4863894cad86
+
+      - name: Upload Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Homeowner-CreateProject-Test-report
+          path: web-automation/cypress/reports/html
