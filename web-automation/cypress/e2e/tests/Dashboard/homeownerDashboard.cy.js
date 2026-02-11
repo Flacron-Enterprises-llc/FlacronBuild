@@ -1214,7 +1214,7 @@ roleObj.clickNextButton()
   
   reviewObj.validateProjectOnMyEstimatesPage()
   
-  
+  /*
   // 1. Load the fixture FIRST
     cy.fixture('loginData.json').then((user) => {
       
@@ -1321,7 +1321,7 @@ roleObj.clickNextButton()
       })
     })
   
-
+*/
 loginObj.clickLogout()
 
 })
