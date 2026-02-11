@@ -7,14 +7,15 @@ const fsExtra = require("fs-extra");
 module.exports = defineConfig({
   reporter: "cypress-mochawesome-reporter",
   video: true,
-
-  reporterOptions: {
-    reportDir: "cypress/reports/html",
-    reportFilename: "[name]-report",
-    embeddedScreenshots: true,
-    inlineAssets: true,
-  },
-
+  
+reporterOptions: {
+  reportDir: "cypress/reports",
+  reportFilename: "[name]-report",
+  embeddedScreenshots: true,
+  inlineAssets: true,
+  html: true,
+  json: true,
+},
   projectId: "h3npwd",
 
   e2e: {
