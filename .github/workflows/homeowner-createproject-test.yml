@@ -25,7 +25,7 @@ jobs:
           CYPRESS_RECORD_KEY: f84cd963-d926-4c10-af50-4863894cad86
 
       - name: Upload Report
-        - name: Upload Report
+      
       if: always()
       uses: actions/upload-artifact@v4
       with:
