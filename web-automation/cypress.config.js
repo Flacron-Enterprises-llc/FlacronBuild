@@ -15,7 +15,7 @@ module.exports = defineConfig({
     inlineAssets: true,
   },
 
-  projectId: "2hxc8g",
+  projectId: "h3npwd",
 
   e2e: {
     testIsolation: true,
