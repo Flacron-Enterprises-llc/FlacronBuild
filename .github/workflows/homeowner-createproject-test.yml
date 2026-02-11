@@ -24,12 +24,11 @@ jobs:
         env:
           CYPRESS_RECORD_KEY: f84cd963-d926-4c10-af50-4863894cad86
 
-      - name: Upload Report
       
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: Constractor-CreateProject-Test-report
-        # Remove the /html at the end
-        path: web-automation/cypress/reports
-        if-no-files-found: error # Changed from 'warn' so it's easier to debug
+      - name: Upload Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Constractor-CreateProject-Test-report
+          path: web-automation/cypress/reports
+          if-no-files-found: error 
