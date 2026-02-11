@@ -6,7 +6,7 @@ on:
 
 jobs:
   project-run:
-    name: Test create project on Chrome browser
+    name: Test Insurance create project on Chrome browser
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -28,5 +28,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: InsuranceAdjuster-CreateProject-Test-report
-          path: web-automation/cypress/reports/html
+          name: Insurance-CreateProject-Test-report
+          path: web-automation/cypress/reports
+          if-no-files-found: error 
+
