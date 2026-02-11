@@ -6,7 +6,7 @@ on:
 
 jobs:
   project-run:
-    name: Test create project on Chrome browser
+    name: TestHomeowner create project on Chrome browser
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
