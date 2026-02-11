@@ -1,0 +1,39 @@
+name: Homeowner Create Project Test Build
+
+on:
+  push:
+    branches:
+      - web-createproject-tests
+
+jobs:
+
+  homeowner-run:
+    name: Homeowner Create Project Test on Chrome
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+         node-version: 22
+
+
+      - name: Install Dependencies
+        working-directory: Web-Automatio
+        run: npm install
+
+      - name: Run Homeowner Signup Test
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: Web-Automatio
+          command: npm run test:homeowner-createProject-test
+        
+          
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: homeowner-create-project-report
+          path: Web-Automatio/cypress/reports/html
