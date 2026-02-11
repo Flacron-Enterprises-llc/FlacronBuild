@@ -6,7 +6,7 @@ on:
 
 jobs:
   project-run:
-    name: Test create project on Edge browser
+    name: Test Contractor create project on Edge browser
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -29,4 +29,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Constractor-CreateProject-Test-report
-          path: web-automation/cypress/reports/html
+          path: web-automation/cypress/reports
+          if-no-files-found: error 
