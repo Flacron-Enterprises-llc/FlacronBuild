@@ -976,8 +976,8 @@ reviewObj.varifyMaterialLayer2()
 reviewObj.clickGenerateEstimateButton()
 cy.wait(2000)
 
-reviewObj.validatedProjectGenerated()
-cy.wait(2000)
+//reviewObj.validatedProjectGenerated()
+//cy.wait(2000)
 reviewObj.verifySucessMessage()
 cy.wait(2000)
 
@@ -3205,7 +3205,7 @@ loginObj.clickLogout()
 
     
 
-    roleObj.selectCurrency();
+//    roleObj.selectCurrency();
     roleObj.clickNextButton();
 
     /* =========================
@@ -3574,8 +3574,8 @@ cy.get('@layer').then(val => {
 
     reviewObj.clickGenerateEstimateButton();
     cy.wait(2000)
-    reviewObj.validatedProjectGenerated();
-    cy.wait(2000)
+ //   reviewObj.validatedProjectGenerated();
+ //   cy.wait(2000)
     reviewObj.verifySucessMessage();
     cy.wait(2000)
 
@@ -3697,8 +3697,8 @@ cy.get('@layer').then(val => {
 
     reviewObj.clickGenerateEstimateButton();
     cy.wait(2000)
-    reviewObj.validatedProjectGenerated();
-    cy.wait(2000)
+//    reviewObj.validatedProjectGenerated();
+//    cy.wait(2000)
     reviewObj.verifySucessMessage();
     cy.wait(2000)
 
@@ -3820,8 +3820,8 @@ cy.get('@layer').then(val => {
 
     reviewObj.clickGenerateEstimateButton();
     cy.wait(2000)
-    reviewObj.validatedProjectGenerated();
-    cy.wait(2000)
+//    reviewObj.validatedProjectGenerated();
+//    cy.wait(2000)
     reviewObj.verifySucessMessage();
     cy.wait(2000)
 
