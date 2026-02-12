@@ -2738,7 +2738,7 @@ reviewObj.varifyRoofAge()
 reviewObj.varifyMaterialLayer1()
 
 // steps 7 click generate button
-
+ 
 reviewObj.clickGenerateEstimateButton()
 cy.wait(2000)
 
