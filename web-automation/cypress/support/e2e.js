@@ -24,7 +24,7 @@ import 'cypress-plugin-steps'
 import 'cypress-slow-down'
 import 'cypress-react-selector';
 import './downloadAndVerifyPSD'
-import './ValidatePDFLanguage'
+import './validatePDFLanguage'
 
 
 
