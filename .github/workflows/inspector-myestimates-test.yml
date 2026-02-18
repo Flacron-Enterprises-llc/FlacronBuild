@@ -1,4 +1,4 @@
-name: inspector MyEstimates test
+name: inspector MyEstimates test on Firefox
 on:
   push:
     branches:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   project-run:
-    name: Test inspector Myestimates on Chrome browser
+    name: Test inspector Myestimates on Firefox browser
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -17,9 +17,9 @@ jobs:
         with:
           working-directory: web-automation
           # 1. Add the browser flag to your custom command
-          command: npm run test:inspector-myEstimates-test -- --record --browser chrome
+          command: npm run test:inspector-myEstimates-test -- --record --browser firefox
           # 2. Specify the browser for the GitHub Action
-          browser: edge
+          browser: firefox
           record: true
         env:
           CYPRESS_RECORD_KEY: f84cd963-d926-4c10-af50-4863894cad86
