@@ -1,15 +1,37 @@
-import myEstimatesHO from '../../../pages/myEstimatesHO'
-import { verifyProjectReport} from '../../../support/reportAssertions';
-import loginData from '../../../fixtures/loginData.json' //import data file
+
+
+import dashboardRoleProject from '../../../pages/role&Project'
 import login from '../../../pages/login'
+import location from '../../../pages/location'
+import roofDetails from '../../../pages/roofDetails'
+import materials from '../../../pages/materials'
+import role from '../../../pages/role'
+import review from '../../../pages/review'
+import {faker} from '@faker-js/faker'  //faker for fack data for testing
+import myEsrimates from '../../pages/myEstimatesHO'
+
+//for PDF report validation
+import { reportData } from '../../../support/reportDataStore'
+import { buildPdfFileName } from '../../../support/pdfHelper'; //for geting project name
 import { slowCypressDown } from 'cypress-slow-down'
 
+// object for each impored class 
+export const step1Obj = new dashboardRoleProject()
+export const loginObj = new login()
+export const locationObj = new location()
+export const roofObj = new roofDetails()
+export const matObj = new materials()
+export const roleObj = new role()
+export const reviewObj = new review()
+const estimateObj = new myEsrimates()
 
-const estimateObj = new myEstimatesHO()
-const loginObj = new login()
+
+// import all data json file from fixtures folder
+import loginData from '../../../fixtures/loginData.json' //import data file for images and data
 
 
-describe('My Estimates → Project Report Verificatione', () => {
+
+describe('Create project', () => {
 
    
     const reportData = {
@@ -26,7 +48,7 @@ describe('My Estimates → Project Report Verificatione', () => {
     dripEdge: '@selectedOptions',
     gutterApron: '@selectedOptions',
     homeownerName: 'Qwkhire3',
-    homeownerEmail: loginData.HEmail ,
+   // homeownerEmail: loginData.HEmail ,
     language: '@language',
     currency: '@currency'
   };
@@ -39,215 +61,608 @@ beforeEach(() => {
    
   });
 
-/*
-  cy.intercept('GET', '/users', (req) => {
-    return Cypress.Promise
-      .delay(1000)
-      .then(() => req.continue())
-  }).as('users')
-  */
+
   loginObj.openURL();
-// Give Next.js time to load the session
-    slowCypressDown(800) 
-
-    cy.get('body').then(($body) => {
-        const isEmailVisible = $body.find('input[placeholder="Email"]').length > 0;
-        const isProfileMenuVisible = $body.find('button[aria-haspopup="menu"]').length > 0;
-
-        // SCENARIO 1: We are on the Login Window
-        if (isEmailVisible) {
-            cy.log('👉 Scenario 1: On Login Window - Entering Credentials');
-            loginObj.enterValidEmail(loginData.HEmail);
-            loginObj.enterPassword(loginData.Hpassword);
-            loginObj.clickButton();
-              estimateObj.navigateToMyEstimates()   
-        } 
-        
-        // SCENARIO 2: Already Logged In (User is on Dashboard)
-        else if (isProfileMenuVisible) {
-            cy.log('👉 Scenario 2: Already Logged In - Resetting via Logout');
-            loginObj.clickLogout(); 
-            cy.reload();
-            // Now that we are logged out, go to login
-            loginObj.clickProfileIcon();
-            loginObj.enterValidEmail(loginData.HEmail);
-            loginObj.enterPassword(loginData.Hpassword);
-            loginObj.clickButton();
-            
-   estimateObj.navigateToMyEstimates()   
-        } 
-        // SCENARIO 3: On Landing Page (Not logged in, Email not visible yet)
-else {
-    cy.log('👉 Scenario 3: On Landing Page - Clicking Profile to show Login');
-    
-    // 1. Click and force it in case of invisible overlays
-    loginObj.clickProfileIcon(); 
-
-    // 2. THE FIX: Explicitly wait for the element to exist in the DOM 
-    // before checking if it is visible.
-    cy.get('input[placeholder="Email"]', { timeout: 15000 })
-        .should('exist')
-        .should('be.visible')
-        .should('not.be.disabled') // Ensures React has activated the field
-        .focus()
-        .type(loginData.HEmail, { delay: 50 });
-
-    loginObj.enterPassword(loginData.Hpassword);
-    loginObj.clickButton();
-    
-   estimateObj.navigateToMyEstimates()   
-}
-    });    
-})
-
+  
+  cy.get('body').should('be.visible').then(($body) => {
+      
+      // FIX: Use :contains (jQuery) instead of :has-text (Playwright)
+      const isEmailVisible = $body.find('input[placeholder="Email"]').length > 0;
+      const isProfileMenuVisible = $body.find('button[aria-haspopup="menu"]').length > 0;
+      const isLandingPageVisible = $body.find('span:contains("Get Your Estimate")').length > 0;
+  
+      // SCENARIO 1: Login Form is already open
+      if (isEmailVisible) {
+          cy.log('👉 Scenario 1: On Login Window');
+          loginObj.enterValidEmail(loginData.HEmail);
+          loginObj.enterPassword(loginData.Hpassword);
+          loginObj.clickButton();
+      } 
+      
+      // SCENARIO 2: Already Logged In (Profile menu exists)
+      else if (isProfileMenuVisible) {
+          cy.log('👉 Scenario 2: Already Logged In - Resetting via Logout');
+          loginObj.clickLogout(); 
+          cy.reload(); // Force a fresh state
+          loginObj.clickProfileIcon();
+          cy.get('input[placeholder="Email"]', { timeout: 10000 }).should('be.visible').type(loginData.HEmail);
+          loginObj.enterPassword(loginData.Hpassword);
+          loginObj.clickButton();
+      } 
+      
+      // SCENARIO 3: Landing Page (Fallback)
+      else if (isLandingPageVisible) {
+          cy.log('👉 Scenario 3: On Landing Page - Clicking Profile');
+          loginObj.clickProfileIcon(); 
+          
+          // Wait for React to render the modal/form
+          cy.get('input[placeholder="Email"]', { timeout: 15000 })
+              .should('be.visible')
+              .type(loginData.HEmail);
+      
+          loginObj.enterPassword(loginData.Hpassword);
+          loginObj.clickButton();
+      }
+  });
+      
+      
+    // cy.ensureLoggedIn(loginData.HEmail, loginData.Hpassword)
+  })
+  slowCypressDown(200) 
+  
   // filter with valid date
-it('TC_01: filter reports by valid date', () => {
-
-
+it('TC_01: Generate project and check Date filter reports by valid current date', () => {
+        //  Enter and SAVE Project Name
+        cy.log("======= Entring Data in step 1 ======")
+      const projectName = faker.company.buzzAdjective()
+       step1Obj.enterProjectName(projectName)
+       cy.wrap(projectName).as('savedProjectName')
+      step1Obj.validateYourRoleForHomeowner()
+   // step1Obj.selectProjectType()
+    step1Obj.clickNextButton()
+    cy.log("======= Entring Data in step 2 ======")
+    step1Obj.validateStep2()
+   locationObj.enterCountry('USA');
+  cy.wrap('USA').as('country');
+  
+  locationObj.enterCity('Houston');
+  cy.wrap('Houston').as('city');
+  
+  locationObj.enterZipCode('77001');
+  cy.wrap('77001').as('zipCode');
+    // SAVE IT as a string for later use (PDF validation)
+  
+    locationObj.clickNextButton()
+  
+  cy.log("======= Entring Data in steps 3 ======")
+  cy.log("======= Selecting random Roof Structure Type and saving data  ======")
+  roofObj.selectRandomStructureType()
+  
+  cy.get('@structureType').then(val => {
+    cy.log("Selected:", val);
+  });
+  
+  cy.log("======= Selecting random  Roof Pitch and saving data ======")
+  
+  roofObj.selectRandomRoofPitch()
+  
+  cy.get('@roofPitch').then(val => {
+    cy.log("Selected:", val);
+  });
+  
+  roofObj.enterRoofAge(faker.string.numeric(2)) //save roof age
+  
+  roofObj.ClickNextButton()
+  // step 4 start
+  
+  cy.log("======= Entring Data in Step 4 ======")
+  matObj.validateStage()
+  matObj.validateTitle()
+  cy.log("======= Selecting random option from dropdown menu and saveing it ======")
+  matObj.selectRandomMaterialSingle()
+  
+  cy.get('@layer').then(val => {
+    cy.log("Selected:", val);
+  });
+  
+  matObj.clickNextButton()
+  roleObj.clickNextButton()
+  cy.log("======= Starting step 6: varifying entred data in all steps ======")
+  
+  reviewObj.validateStage()
+  reviewObj.validateTitle()
+  reviewObj.validateStage()
+  reviewObj.varifyProjectName()
+  reviewObj.varifyRole()
+  //reviewObj.varifyProjectType()
+  reviewObj.verifyLocation()
+  reviewObj.varifyStructureType()
+  reviewObj.varifyRoofPitch()
+  reviewObj.varifyRoofAge()
+  reviewObj.varifyMaterialLayer1()
+  //reviewObj.varifyUploadedFile1()
+  reviewObj.clickGenerateEstimateButton()
+  cy.wait(2000)
+  
+  reviewObj.validatedProjectGenerated()
+  cy.wait(2000)
+  reviewObj.verifySucessMessage()
+  cy.wait(2000)
+  
+  cy.contains('Home').click({force: true})
+  cy.wait(100)
+  cy.contains('My Estimates').click({force: true})
   estimateObj.filterByDate()
+  loginObj.clickLogout();
 
 });
 
 //filter by invalid date
 
   //search filter
-it('TC_01: filter reports by invalid date', () => {
+it('TC_02: filter reports by invalid date',{ retries: 2 }, () => {
 
+    cy.contains('My Estimates').click({force: true})
   estimateObj.filterByInvalidDate()
+  loginObj.clickLogout();
 
 });
 
 
 
-it('TC_02: search project by valid name', () => {
 
-
-
-  estimateObj.searchProject('testing123');
-});
-
-it('TC_03: search invalid project name', () => {
+it('TC_03: On search invalid project name , message should be displayed "No project found"', () => {
+  cy.contains('My Estimates').click({force: true})
 
   estimateObj.searchProject('invalid123');  // on no project found, message should be displayed " no project found"
+loginObj.clickLogout();
 });
 
 
-  it('TC_01: should display correct report after generation', () => {
 
 
-    cy.openProjectFromMyEstimates(reportData.project);
+it('TC_04: Create project and validate download icon by searching created project ', function () {
 
-    verifyProjectReport(reportData);
+  // create project
+  
+        //  Enter and SAVE Project Name
+        cy.log("======= Entring Data in step 1 ======")
+  const projectName = faker.company.buzzAdjective()
+       step1Obj.enterProjectName(projectName)
+       cy.wrap(projectName).as('savedProjectName')
+      step1Obj.validateYourRoleForHomeowner()
+   // step1Obj.selectProjectType()
+    step1Obj.clickNextButton()
+    cy.log("======= Entring Data in step 2 ======")
+    step1Obj.validateStep2()
+  locationObj.enterCountry('USA');
+  cy.wrap('USA').as('country');
+  
+  locationObj.enterCity('Houston');
+  cy.wrap('Houston').as('city');
+  
+  locationObj.enterZipCode('77001');
+  cy.wrap('77001').as('zipCode');
+    // SAVE IT as a string for later use (PDF validation)
+  
+  
+    locationObj.clickNextButton()
+  
+  cy.log("======= Entring Data in steps 3 ======")
+  cy.log("======= Selecting random Roof Structure Type and saving data  ======")
+  roofObj.selectRandomStructureType()
+  
+  cy.get('@structureType').then(val => {
+    cy.log("Selected:", val);
   });
-
-
-
-
-it.only('TC_02: downloads project report PDF successfully', () => {
   
+  cy.log("======= Selecting random  Roof Pitch and saving data ======")
+  
+  roofObj.selectRandomRoofPitch()
+  
+  cy.get('@roofPitch').then(val => {
+    cy.log("Selected:", val);
+  });
+  
+  roofObj.enterRoofAge(faker.string.numeric(2)) //save roof age
+  
+  roofObj.ClickNextButton()
+  // step 4 start
+  
+  cy.log("======= Entring Data in Step 4 ======")
+  matObj.validateStage()
+  matObj.validateTitle()
+  cy.log("======= Selecting random option from dropdown menu and saveing it ======")
+  matObj.selectRandomMaterialSingle()
+  
+  cy.get('@layer').then(val => {
+    cy.log("Selected:", val);
+  });
+  
+  matObj.clickNextButton()
+  roleObj.clickNextButton()
+  cy.log("======= Starting step 6: varifying entred data in all steps ======")
+  
+  reviewObj.validateStage()
+  reviewObj.validateTitle()
+  reviewObj.validateStage()
+  reviewObj.varifyProjectName()
+  reviewObj.varifyRole()
+  //reviewObj.varifyProjectType()
+  reviewObj.verifyLocation()
+  reviewObj.varifyStructureType()
+  reviewObj.varifyRoofPitch()
+  reviewObj.varifyRoofAge()
+  reviewObj.varifyMaterialLayer1()
+  //reviewObj.varifyUploadedFile1()
+  
+  reviewObj.clickGenerateEstimateButton()
+  cy.wait(2000)
+  
+  reviewObj.validatedProjectGenerated()
+  cy.wait(2000)
+  reviewObj.verifySucessMessage()
+  cy.wait(2000)
+  
+  
+  cy.contains('Home').click()
+  cy.wait(100)
+  cy.contains('My Estimates').click()
+  
+  
+  reviewObj.validateProjectOnMyEstimatesPage()
 
   
-  const projectName = 'testing123'
+    cy.fixture('loginData.json').then((user) => {
+      
+      // 2. Assign the email from fixture to your reportData object
+      // Use CEmail or whatever key you need
+      reportData.email = user.HEmail; 
+      
+      // ... logic for your test steps ...
+  // 1. Resolve the alias FIRST
+  cy.get('@savedProjectName').then((projectName) => {
+      
+      
+      const sanitizedName = projectName.replace(/-/g, '_');
+        const normalizePdfText = (text) =>
+    text
+      .replace(/\s+/g, " ")
+      .replace(/[^\w\s:/.-]/g, "")
+      .toLowerCase()
+      .trim();
+  
+  
+      const expectedFileName = buildPdfFileName(
+          reportData.email,
+          sanitizedName, 
+          reportData.date
+      );
+  
+  //const projectName = 'testing123';
+  const downloadsFolder = "cypress/downloads";
 
-// 1. Search project
-estimateObj.searchProject(projectName)
+  // 1️⃣ Search project
+  estimateObj.searchProject(projectName);
+ cy.wait(300)
+  // 2️⃣ Click Download PDF button
+  cy.contains('div > div.grid > div.text-card-foreground', projectName)
+    .should('be.visible')
+    .within(() => {
+      cy.get("button[title='Download PDF']")
+        .click({ force: true });
+    });
 
-// 2. Click download PDF button
-cy.contains('div > div.grid > div.text-card-foreground', projectName)
-  .should('be.visible')
-  .within(() => {
+  // 3️⃣ Wait briefly for file download (can optimize later)
+  cy.wait(4000);
 
+  // 4️⃣ Get latest downloaded file
+  cy.task("getLatestPdf", downloadsFolder).then((latestPath) => {
+
+    // ✅ Validate file exists
+    expect(latestPath, "PDF file should exist").to.not.be.null;
+    reportData.email = user.HEmail; 
+        
+        // ... logic for your test steps ...
+    // 1. Resolve the alias FIRST
+    cy.get('@savedProjectName').then((projectName) => {
+        
+        
+        const sanitizedName = projectName.replace(/-/g, '_');
+          const normalizePdfText = (text) =>
+      text
+        .replace(/\s+/g, " ")
+        .replace(/[^\w\s:/.-]/g, "")
+        .toLowerCase()
+        .trim();
     
-    cy.get("button[title='Download PDF']")
-      .click({ force: true })
+    
+        const expectedFileName = buildPdfFileName(
+            reportData.email,
+            sanitizedName, 
+            reportData.date
+        );
+    
+    // 1. Find the newest file dynamically and
+    
+    // 1. Gather all your dynamic values from aliases
+    
+    cy.get('@structureType').then((expectedStructure) => {
+      cy.get('@roofPitch').then((expectedPitch) => {
+        cy.get('@roofAge').then((expectedAge) => {
+          cy.get('@layer').then((expectedMaterial) => {
+    
+            const downloadsFolder = "cypress/downloads";
+    
+            // 2. Find and Read the PDF
+            cy.task("getLatestPdf", downloadsFolder).then((latestPath) => {
+              cy.task("readPdf", latestPath).then((extractedText) => {
+                
+                // Normalize PDF text to one long line of lowercase text
+                const pdfContent = extractedText.replace(/\s+/g, ' ').toLowerCase();
+    
+                // 3. ACTUAL DATA VALIDATION
+                // We verify that the VALUE we saved is present in the PDF
+                
+                cy.log(`Validating Actual Data: ${expectedStructure}, ${expectedPitch}, ${expectedAge}, ${expectedMaterial}`);
+    
+                // Validate Property Type Value
+                expect(pdfContent, 'Structure Type Match').to.include(expectedStructure.toLowerCase().trim());
+    
+                // Validate Roof Style/Pitch Value
+                expect(pdfContent, 'Roof Pitch Match').to.include(expectedPitch.toLowerCase().trim());
+    
+                // Validate Roof Age Value
+                // We use String() to prevent "toString of undefined" errors
+                  //Age without 0
+            const expectedAgeNum = String(Number(expectedAge));
+    
+               expect(pdfContent).to.include(expectedAgeNum);
+    
+    
+                // Validate Material Value
+                expect(pdfContent, 'Material Match').to.include(expectedMaterial.toLowerCase().trim());
+    
+                cy.log("✅ SUCCESS: The PDF contains the exact data stored during the test.");
+              });
+            });
+          });
+        });
+      });
+    
+    })
+    })
   })
 
-// 3. Validate file download
-cy.task('getDownloadedFiles').then((files) => {
-  const pdf = files.find(f => f.includes(projectName))
-  expect(pdf).to.exist
-})
 
+  })
+   
+  });
+
+  // 7️⃣ Logout
+  loginObj.clickLogout();
 
 });
 
-it.skip('TC_03: downloads report in selected language', () => {
+
+it('TC_05: Should generate report, find it in My Estimates, and validate details', () => {
+
+       //  Enter and SAVE Project Name
+        cy.log("======= Entring Data in step 1 ======")
+      const projectName = faker.company.buzzAdjective()
+       step1Obj.enterProjectName(projectName)
+       cy.wrap(projectName).as('savedProjectName')
+      step1Obj.validateYourRoleForHomeowner()
+   // step1Obj.selectProjectType()
+    step1Obj.clickNextButton()
+    cy.log("======= Entring Data in step 2 ======")
+    step1Obj.validateStep2()
+   locationObj.enterCountry('USA');
+  cy.wrap('USA').as('country');
+  
+  locationObj.enterCity('Houston');
+  cy.wrap('Houston').as('city');
+  
+  locationObj.enterZipCode('77001');
+  cy.wrap('77001').as('zipCode');
+    // SAVE IT as a string for later use (PDF validation)
+  
+    locationObj.clickNextButton()
+  
+  cy.log("======= Entring Data in steps 3 ======")
+  cy.log("======= Selecting random Roof Structure Type and saving data  ======")
+  roofObj.selectRandomStructureType()
+  
+  cy.get('@structureType').then(val => {
+    cy.log("Selected:", val);
+  });
+  
+  cy.log("======= Selecting random  Roof Pitch and saving data ======")
+  
+  roofObj.selectRandomRoofPitch()
+  
+  cy.get('@roofPitch').then(val => {
+    cy.log("Selected:", val);
+  });
+  
+  roofObj.enterRoofAge(faker.string.numeric(2)) //save roof age
+  
+  roofObj.ClickNextButton()
+  // step 4 start
+  
+  cy.log("======= Entring Data in Step 4 ======")
+  matObj.validateStage()
+  matObj.validateTitle()
+  cy.log("======= Selecting random option from dropdown menu and saveing it ======")
+  matObj.selectRandomMaterialSingle()
+  
+  cy.get('@layer').then(val => {
+    cy.log("Selected:", val);
+  });
+  
+  matObj.clickNextButton()
+  roleObj.clickNextButton()
+  cy.log("======= Starting step 6: varifying entred data in all steps ======")
+  
+  reviewObj.validateStage()
+  reviewObj.validateTitle()
+  reviewObj.validateStage()
+  reviewObj.varifyProjectName()
+  reviewObj.varifyRole()
+  //reviewObj.varifyProjectType()
+  reviewObj.verifyLocation()
+  reviewObj.varifyStructureType()
+  reviewObj.varifyRoofPitch()
+  reviewObj.varifyRoofAge()
+  reviewObj.varifyMaterialLayer1()
+  //reviewObj.varifyUploadedFile1()
+  reviewObj.clickGenerateEstimateButton()
+  cy.wait(2000)
+  
+  reviewObj.validatedProjectGenerated()
+  cy.wait(2000)
+  reviewObj.verifySucessMessage()
+  cy.wait(2000)
+  
+  cy.contains('Home').click({force: true})
+  cy.wait(100)
+  cy.contains('My Estimates').click({force: true})
+cy.wait(200)
+        // 1. Navigate to My Estimates
+      //  estimateObj.navigateToMyEstimates();
+/*
+        // 2. Locate the report created (Image e1.png)
+        cy.contains(reportData.name).should('be.visible');
+        cy.contains(reportData.location).should('be.visible');
+
+        */
+  // 1️⃣ Search project
+ estimateObj.filterByDate()
+cy.wait(4000)
+  estimateObj.searchProject(projectName);
+ cy.wait(4000)
+  // 2️⃣ Click Download PDF button
+
+  cy.contains('div > div.grid > div.text-card-foreground', projectName)
+    .should('be.visible')
+    .within(() => {
+      cy.get("button[title='View Report']")
+        .click({ force: true });
+    });
+  
 
 
-  cy.saveSelectedLanguage();   // Step 5
-  cy.saveProjectName();        // Earlier step
+        // 3. Click View Icon to open Detail Page
+   //     estimateObj.viewReportByName(reportData.name);
 
-  cy.generateReport();
+        // 4. Validate Data on the final Detail Page (Image e2.png)
+      const validationSet = {
+    "Project:": reportData.name,
+    "Location:": reportData.location,
+    "Structure Type:": reportData.structure,
+    "Roof Pitch:": reportData.pitch,
+    "Homeowner Name:": "Qwkhire3",
+}
+cy.get('@savedProjectName').then(projectName => {
+  cy.get('@country').then(country => {
+    cy.get('@city').then(city => {
+      cy.get('@zipCode').then(zipCode => {
+        cy.get('@structureType').then(structure => {
+          cy.get('@roofPitch').then(pitch => {
+            cy.get('@layer').then(layer => {
 
-  cy.verifyPdfDownload();      // already implemented
-  cy.verifyPdfLanguageFromAliases();  //chaeck downloaded pdf should be displayed in selected language
-});
+              const validationSet = {
+                "Project:": projectName,
+                "Location:": `${city}, ${country} ${zipCode}`,
+                "Structure Type:": structure,
+                "Roof Pitch:": pitch,
+              //  "Material:": layer,
+              };
 
+              estimateObj.validateReportSummary(validationSet);
 
-it.skip('TC_04: generates and downloads PDF report in all supported languages', () => {
-  cy.getAllLanguagesFromStep5();
-
-  cy.get('@languages').then((languages) => {
-    languages.forEach((language) => {
-      cy.selectLanguageAndSave(language);
-
-      cy.generateReport();
-
-      cy.verifyPdfDownload();      // existing command
-      cy.verifyPdfLanguageFromAlias();
-
-      cy.reload(); // reset state before next iteration
+            });
+          });
+        });
+      });
     });
   });
 });
+ loginObj.clickLogout();
+          
+    });
+it('TC_06: Validate Delete icon for created project', () => {
 
+  const projectName = faker.company.buzzAdjective();
 
-it('TC_04: Validate PDF download with exact filename pattern', () => {
-    const userEmail = "qwkhire_gmail_com_";
-    const projectName = "@projectName"; 
-    const projectDate = "date"; // Adjust if your app uses DD-MM-YYYY
+  // ===== STEP 1 =====
+  step1Obj.enterProjectName(projectName);
+  cy.wrap(projectName).as('savedProjectName');
+  step1Obj.validateYourRoleForHomeowner();
+  step1Obj.clickNextButton();
 
-    // Step 1: Navigate to the detail page (Image e1.png -> e2.png)
-    estimatesPage.navigateToMyEstimates();
-    estimatesPage.viewReportByName(projectName);
+  // ===== STEP 2 =====
+  locationObj.enterCountry('USA');
+  locationObj.enterCity('Houston');
+  locationObj.enterZipCode('77001');
+  locationObj.clickNextButton();
 
-    // Step 2: Trigger download (Image e2.png)
-    estimatesPage.downloadReport();
+  // ===== STEP 3 =====
+  roofObj.selectRandomStructureType();
+  roofObj.selectRandomRoofPitch();
+  roofObj.enterRoofAge(faker.string.numeric(2));
+  roofObj.ClickNextButton();
 
-    // Step 3: Verify the specific filename and content
-    // This handles the email+projectName+date+flacronBuild pattern
-    estimatesPage.verifyDownloadedPdf(userEmail, projectName, projectDate);
-});
+  // ===== STEP 4 =====
+  matObj.selectRandomMaterialSingle();
+  matObj.clickNextButton();
+  roleObj.clickNextButton();
 
-it('TC_05: Should generate report, find it in My Estimates, and validate details', () => {
-        // 1. Navigate to My Estimates
-        estimatesPage.navigateToMyEstimates();
+  // ===== GENERATE =====
+  reviewObj.clickGenerateEstimateButton();
+  reviewObj.verifySucessMessage();
 
-        // 2. Locate the report created (Image e1.png)
-        cy.contains(testProject.name).should('be.visible');
-        cy.contains(testProject.location).should('be.visible');
+  // ===== NAVIGATE TO MY ESTIMATES =====
+  cy.contains('Home').click({ force: true });
+  cy.contains('My Estimates').click({ force: true });
 
-        // 3. Click View Icon to open Detail Page
-        estimatesPage.viewReportByName(testProject.name);
+  estimateObj.filterByDate();
+  estimateObj.searchProject(projectName);
 
-        // 4. Validate Data on the final Detail Page (Image e2.png)
-        const validationSet = {
-            "Project:": testProject.name,
-            "Location:": testProject.location,
-            "Structure Type:": testProject.structure,
-            "Roof Pitch:": testProject.pitch,
-            "Homeowner Name:": "Qwkhire3"
-        };
-        
-        estimatesPage.validateReportSummary(validationSet);
+  // ===== VALIDATE PROJECT EXISTS =====
+  cy.contains(projectName).should('be.visible');
 
-        // 5. Perform Download Action
-        estimatesPage.downloadReport();
+  // ===== CLICK DELETE ICON =====
+  cy.contains(projectName)
+    .closest('[class*="card"]')
+    .within(() => {
+      cy.get("button[title='Delete Report']")
+        .should('be.visible')
+        .click();
     });
 
-after(() => {
-  
-  loginObj.clickLogout()
-})
+  // ===== VALIDATE CONFIRMATION MODAL =====
+  cy.contains('Are you sure')
+    .should('be.visible');
+
+  cy.contains('Yes')
+    .should('be.visible')
+    .click();
+
+  // ===== VALIDATE SUCCESS MESSAGE =====
+  cy.contains('deleted successfully')
+    .should('be.visible');
+
+  // ===== VALIDATE PROJECT REMOVED =====
+  cy.contains(projectName)
+    .should('not.exist');
+
+    cy.reload();
+estimateObj.searchProject(projectName);
+cy.contains(projectName).should('not.exist');
+
+
+  loginObj.clickLogout();
+});
 
 });

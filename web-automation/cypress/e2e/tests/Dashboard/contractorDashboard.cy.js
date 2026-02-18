@@ -1276,7 +1276,7 @@ loginObj.clickLogout()
 //test creating project with selecting any felt type or checkboxes
 
 
- it('TC-12: Test layes wihtout selecting felt type on material steps 4/6',  { retries: 2 },()=>{
+ it('TC-12: Test layes without selecting felt type on material steps 4/6',  { retries: 2 },()=>{
 
 cy.log("======= Entring Data ======")
 

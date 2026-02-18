@@ -45,7 +45,9 @@ class login {
   clickLogout() {
     // Use the CSS class or aria-label instead of a dynamic ID
     cy.get('.w-8.h-8.bg-primary.rounded-full.flex.items-center.justify-center').first().click({ force: true });
-    cy.contains('Logout').click({ force: true });
+   // cy.get('div[class="relative flex select-none items-center gap-2 rounded-sm text-sm outline-none transition-colors focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 text-red-500 focus:text-red-600 py-4 px-2 cursor-pointer"]').click({ force: true });
+     
+   cy.contains('Logout').click({ force: true });
 }
 
 /*

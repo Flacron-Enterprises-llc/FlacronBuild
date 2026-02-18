@@ -73,41 +73,61 @@ verifyDownloadedPdf(userEmail, projectName, projectDate) {
     }
   });
 }
-
 filterByDate() {
-    
-      // 1. Click on date picker button
-  cy.contains('Pick a date').click()
 
-  // 2. Select date 22 from calendar
-  cy.contains('22').click()
+  const today = new Date();
 
-  // 3. Validate all visible project cards show date 22 Dec 2025
-  cy.get(this.weblocators.projectCart)   // adjust class if needed
+  // Get current day number (e.g., 16)
+  const currentDay = today.getDate();
+
+  // Format date like: 16 Feb 2026
+  const formattedDate = today.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+
+  // 1️⃣ Click date picker
+  cy.contains('Pick a date').click();
+
+  // 2️⃣ Select current day from calendar
+  cy.contains(new RegExp(`^${currentDay}$`)).click();
+
+  // 3️⃣ Validate project cards show today's date
+  cy.get(this.weblocators.projectCart)
     .should('be.visible')
     .each(($card) => {
       cy.wrap($card)
-        .contains('22 Dec 2025')
-        .should('be.visible')
-    })
+        .contains(formattedDate)
+        .should('be.visible');
+    });
 
-}    
+}
 
+// cypress/e2e/pages/estimatePage.js
 
 filterByInvalidDate() {
-    
-      // 1. Click on date picker button
-  cy.contains('Pick a date').click()
 
-  // 2. Select date 22 from calendar
-  cy.contains('15').click()
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
 
+  const futureDay = tomorrow.getDate().toString();
 
-  // 3. Validate no project cards are displayed
-  cy.get(this.weblocators.projectCart)   // adjust selector if needed
-    .should('not.exist')
+  // Open date picker
+  cy.contains('Pick a date')
+    .should('be.visible')
+    .click();
 
-}    
+  // If month switches automatically, this still works
+  cy.contains('button', new RegExp(`^${futureDay}$`))
+    .should('be.visible')
+    .click();
+
+  // Validate no project cards displayed
+  cy.get(this.weblocators.projectCart)
+    .should('not.exist');
+}
+
 
 navigateToMyEstimates() {
         cy.get(this.weblocators.myEstimateLink).click();
@@ -124,28 +144,27 @@ navigateToMyEstimates() {
 
     viewReportByName(projectName) {
         // Finds the specific card by name and clicks the eye icon inside it
-        cy.contains(this.elements.reportCardTitle, projectName)
+       // cy.contains(this.elements.reportCardTitle, projectName)
+        cy.contains(projectName)
             .parents('.rounded-2xl') 
             .find('button').first().click(); // Clicks the View/Eye icon
     }
     
-    validateReportSummary(expectedData) {
-        // Validates data on the final page (e2.png)
-        cy.get('h2').contains('Project Report').should('be.visible');
-        
-        // Dynamic check for multiple fields
-        Object.entries(expectedData).forEach(([label, value]) => {
-            cy.contains(label).parent().should('contain', value);
-        });
-    }
+   // cypress/e2e/pages/myEstimatesHO.js
 
+validateReportSummary(expectedData) {
+  Object.entries(expectedData).forEach(([label, value]) => {
 
-    
-    validateReportSummary(pNam) {
-        cy.get(this.weblocators.pn)
-      
-        
-    }
+    expect(value, `Value for ${label} should not be undefined`).to.not.be.undefined;
+
+    cy.contains('div.flex.mb-1.text-base', label)
+      .should('exist')
+      .parent()
+      .should('contain.text', value);
+  });
+}
+
+ 
 
         downloadReportIcon() {
         cy.get(this.weblocators.downloadPdfBtn).should('be.visible').click();

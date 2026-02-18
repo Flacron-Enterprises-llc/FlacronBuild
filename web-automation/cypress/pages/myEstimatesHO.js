@@ -157,14 +157,7 @@ navigateToMyEstimates() {
         cy.get(this.elements.delectReportIcon).should('be.visible').click();
     }
 
-/*
 
-selectDateFromCalendar(day) {
-  cy.get(this.weblocators.datePicker).click()
-  cy.contains('button', day).click()
-}
-
-*/
 
 }
 

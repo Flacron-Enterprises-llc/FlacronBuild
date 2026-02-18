@@ -7,6 +7,10 @@
     "test:contractor-createProject-test": "npx cypress run   --spec cypress/e2e/tests/Dashboard/contractorDashboard.cy.js ",
     "test:inspector-createProject-test": "npx cypress run   --spec cypress/e2e/tests/Dashboard/inspectorDashboard.cy.js ",
     "test:insuranceAdjuster-createProject-test": "npx cypress run   --spec cypress/e2e/tests/Dashboard/insuranceAdjusterDashboard.cy.js ",
+    "test:homeowner-myEstimates-test": "npx cypress run   --spec cypress/e2e/tests/compareEstimatesPagesTest/homeOwnerEstimatesTest.cy.js ",
+    "test:contractor-myEstimates-test": "npx cypress run   --spec cypress/e2e/tests/compareEstimatesPagesTest/contractorEstimatesTest.cy.js ",
+    "test:inspector-myEstimates-test": "npx cypress run   --spec cypress/e2e/tests/compareEstimatesPagesTest/inspectorEstimaTest.cy.js ",
+    "test:insuranceAdjuster-myEstimates-test": "npx cypress run   --spec cypress/e2e/tests/compareEstimatesPagesTest/insuranceAdjusterEstimatesTest.cy.js ",
     "test": "npx cypress run --record --key f84cd963-d926-4c10-af50-4863894cad86"
   },
   "repository": {

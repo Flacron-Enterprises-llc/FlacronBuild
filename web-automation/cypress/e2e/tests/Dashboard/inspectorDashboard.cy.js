@@ -3065,7 +3065,7 @@ step1Obj.enterProjectName(projectName);
      /* ======================
        STEP 5 – USER SELECTS GERMAN
        ====================== */
-    cy.get('#\\:r4d\\:-form-item').click({ force: true });
+    cy.get('button[role="combobox"]:has(span:contains("English"))').click({ force: true });
     cy.contains('[role="option"]', 'Chinese').click({ force: true });
 
     roleObj.clickNextButton();
