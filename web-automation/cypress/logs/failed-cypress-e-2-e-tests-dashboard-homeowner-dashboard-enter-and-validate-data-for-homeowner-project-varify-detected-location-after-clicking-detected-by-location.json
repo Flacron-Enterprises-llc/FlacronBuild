@@ -1,0 +1,23 @@
+{
+  "specName": "cypress\\e2e\\tests\\Dashboard\\homeownerDashboard.cy.js",
+  "title": "Varify Detected location after clicking detected by location",
+  "suiteName": "Enter and validate data for Homeowner Project",
+  "testName": "Enter and validate data for Homeowner Project Varify Detected location after clicking detected by location",
+  "testError": "Timed out retrying after 15000ms: Expected to find element: `input[placeholder=\"Email\"]`, but never found it.\n\nBecause this error occurred during a `before each` hook we are skipping the remaining tests in the current suite: `Enter and validate data for...`",
+  "testCommands": [
+    "clearAllLocalStorage ",
+    "clearCookies ",
+    "visit https://flacronbuild.com/",
+    "get body",
+    "get .w-8.h-8.bg-primary.rounded-full.flex.items-center.justify-center",
+    "request ",
+    "alert This site uses cookies to enhance your experience. By continuing, you agree to our use of cookies.",
+    "click ",
+    "request ",
+    "get input[placeholder=\"Email\"]",
+    "request ",
+    "request ",
+    "request ",
+    "request "
+  ]
+}
