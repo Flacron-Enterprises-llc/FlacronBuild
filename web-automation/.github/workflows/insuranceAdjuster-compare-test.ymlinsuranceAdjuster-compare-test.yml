@@ -1,0 +1,33 @@
+name: InsuranceAdjuster Compare test on Chrome browser
+on:
+  push:
+    branches:
+      - web-compairpage-test
+
+jobs:
+  project-run:
+    name: Test Insurance Compare Chrome browser
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run insuranceAdjuster compare Test
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: web-automation
+          # 1. Add the browser flag to your custom command
+          command: npm run test:insuranceAdjuster-compairPage-test -- --record --browser chrome
+          # 2. Specify the browser for the GitHub Action
+          browser: chrome
+          record: true
+        env:
+          CYPRESS_RECORD_KEY: f84cd963-d926-4c10-af50-4863894cad86
+ 
+      - name: Upload Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Insurance-Compare-Test-report
+          path: web-automation/cypress/reports
+          if-no-files-found: error 
