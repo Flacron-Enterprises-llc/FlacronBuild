@@ -14,7 +14,7 @@ import { generateShortUniqueCompanyName } from '../../../support/utils';
 
 import { slowCypressDown } from 'cypress-slow-down'
 
-// object for each impored class 
+// object for each imported class 
 export const step1Obj = new dashboardRoleProject()
 export const loginObj = new login()
 export const locationObj = new location()
@@ -127,61 +127,64 @@ describe('Compare Estimates — Inspector', () => {
     
   const projectName = generateShortUniqueCompanyName('TestOne');
            step1Obj.enterProjectName(projectName)
-           cy.wrap(projectName).as('savedProjectName')
-        
-      
-              step1Obj.validateYourRole()
-           
-              step1Obj.selectProjectTypeDropdown()
-              step1Obj.clickNextButton()
-              step1Obj.validateStep2()
-      
-      
-        // start step 2
-      
-       cy.log("======= Entring Data in step 2 ======")
-        step1Obj.validateStep2()
-      locationObj.enterCountry('USA');
-      cy.wrap('USA').as('country');
-      
-      locationObj.enterCity('Houston');
-      cy.wrap('Houston').as('city');
-      
-      locationObj.enterZipCode('77001');
-      cy.wrap('77001').as('zipCode');
-      
+     cy.wrap(projectName).as('savedProjectName')
+  
+
+        step1Obj.validateYourRole()
      
+        step1Obj.selectProjectTypeDropdown()
+        step1Obj.clickNextButton()
+        step1Obj.validateStep2()
+
+  // start step 2
+        cy.log("======= Entring Data in step 2 ======")
+  step1Obj.validateStep2()
+locationObj.enterCountry('USA');
+cy.wrap('USA').as('country');
+
+locationObj.enterCity('Houston');
+cy.wrap('Houston').as('city');
+
+locationObj.enterZipCode('77001');
+cy.wrap('77001').as('zipCode');
+/*
+        cy.log("======= Uploading valid image ======")
+        locationObj.uploadValidImage()
+
+        locationObj.varifyUploadImage()
+        locationObj.validateMyLocation()
+        */
         locationObj.clickNextButton()
-      
-      // step 3 start
-      
-      cy.log("======= Entring Data in steps 3 ======")
-      cy.log("======= Selecting random Roof Structure Type ======")
-      roofObj.selectRandomStructureType()
-      
-      
-      cy.get('@structureType').then(val => {
-        cy.log("Selected:", val);
-      });
-      
-      cy.log("======= Selecting random  Roof Pitch ======")
-      
-      roofObj.selectRandomRoofPitch()
-      
-      cy.get('@roofPitch').then(val => {
-        cy.log("Selected:", val);
-      });
-      
-      cy.log("======= Entring Random number ======")
-      roofObj.enterRoofAge(faker.string.numeric(2))
-      
-      cy.get('@roofAge').then(val => {
-        cy.log("Selected:", val);
-      });
-      
-      roofObj.ClickNextButton()
-      // step 4 start
-      
+
+// step 3 start
+
+cy.log("======= Entring Data in steps 3 ======")
+cy.log("======= Selecting random Roof Structure Type ======")
+roofObj.selectRandomStructureType()
+
+cy.get('@structureType').then(val => {
+  cy.log("Selected:", val);
+});
+
+cy.log("======= Selecting random  Roof Pitch ======")
+
+roofObj.selectRandomRoofPitch()
+
+cy.get('@roofPitch').then(val => {
+  cy.log("Selected:", val);
+});
+
+
+cy.log("======= Entring Random number ======")
+roofObj.enterRoofAge(faker.string.numeric(2))
+
+cy.get('@roofAge').then(val => {
+  cy.log("Selected:", val);
+});
+
+roofObj.ClickNextButton()
+// step 4 start
+
       cy.log("======= Entring Data in Step 4 ======")
       matObj.validateStage()
       matObj.validateTitle()
@@ -221,7 +224,7 @@ describe('Compare Estimates — Inspector', () => {
       cy.contains('Home').click({force: true})
       cy.wait(100)
    
-        //now create an other project for compair
+        //now create another project for comparison
 
           //  Enter and SAVE Project Name
            
@@ -230,61 +233,64 @@ describe('Compare Estimates — Inspector', () => {
            //  Enter and SAVE Project Name
           const projectName1 = generateShortUniqueCompanyName('Test2');
                step1Obj.enterProjectName(projectName1)
-               cy.wrap(projectName1).as('savedProjectName2')
-            
-          
-                  step1Obj.validateYourRole()
-               
-                  step1Obj.selectProjectTypeDropdown()
-                  step1Obj.clickNextButton()
-                  step1Obj.validateStep2()
-          
-               
-                 // start step 2
-               
-                cy.log("======= Entring Data in step 2 ======")
-                 step1Obj.validateStep2()
-               locationObj.enterCountry('USA');
-               cy.wrap('USA').as('country1');
-               
-               locationObj.enterCity('Houston');
-               cy.wrap('Houston').as('city1');
-               
-               locationObj.enterZipCode('77001');
-               cy.wrap('77001').as('zipCode1');
-               
-              
-                 locationObj.clickNextButton()
-               
-               // step 3 start
-               
-               cy.log("======= Entring Data in steps 3 ======")
-               cy.log("======= Selecting random Roof Structure Type ======")
-               roofObj.selectRandomStructureType2()
-               
-               
-               cy.get('@structureType2').then(val => {
-                 cy.log("Selected:", val);
-               });
-               
-               cy.log("======= Selecting random  Roof Pitch ======")
-               
-               roofObj.selectRandomRoofPitch2()
-               
-               cy.get('@roofPitch2').then(val => {
-                 cy.log("Selected:", val);
-               });
-               
-               cy.log("======= Entring Random number ======")
-               roofObj.enterRoofAge2(faker.string.numeric(2))
-               
-               cy.get('@roofAge2').then(val => {
-                 cy.log("Selected:", val);
-               });
-               
-               roofObj.ClickNextButton()
-               // step 4 start
-               
+     cy.wrap(projectName1).as('savedProjectName')
+  
+
+        step1Obj.validateYourRole()
+     
+        step1Obj.selectProjectTypeDropdown()
+        step1Obj.clickNextButton()
+        step1Obj.validateStep2()
+
+  // start step 2
+        cy.log("======= Entring Data in step 2 ======")
+  step1Obj.validateStep2()
+locationObj.enterCountry('USA');
+cy.wrap('USA').as('country');
+
+locationObj.enterCity('Houston');
+cy.wrap('Houston').as('city');
+
+locationObj.enterZipCode('77001');
+cy.wrap('77001').as('zipCode');
+/*
+        cy.log("======= Uploading valid image ======")
+        locationObj.uploadValidImage()
+
+        locationObj.varifyUploadImage()
+        locationObj.validateMyLocation()
+        */
+        locationObj.clickNextButton()
+
+// step 3 start
+
+cy.log("======= Entring Data in steps 3 ======")
+cy.log("======= Selecting random Roof Structure Type ======")
+roofObj.selectRandomStructureType()
+
+cy.get('@structureType').then(val => {
+  cy.log("Selected:", val);
+});
+
+cy.log("======= Selecting random  Roof Pitch ======")
+
+roofObj.selectRandomRoofPitch()
+
+cy.get('@roofPitch').then(val => {
+  cy.log("Selected:", val);
+});
+
+
+cy.log("======= Entring Random number ======")
+roofObj.enterRoofAge(faker.string.numeric(2))
+
+cy.get('@roofAge').then(val => {
+  cy.log("Selected:", val);
+});
+
+roofObj.ClickNextButton()
+// step 4 start
+
                cy.log("======= Entring Data in Step 4 ======")
                matObj.validateStage()
                matObj.validateTitle()
@@ -407,7 +413,7 @@ loginObj.clickLogout();
        
  //  Enter and SAVE Project Name
 const projectName = generateShortUniqueCompanyName('Test3');
-     step1Obj.enterProjectName(projectName)
+    step1Obj.enterProjectName(projectName)
      cy.wrap(projectName).as('savedProjectName')
   
 
@@ -417,51 +423,55 @@ const projectName = generateShortUniqueCompanyName('Test3');
         step1Obj.clickNextButton()
         step1Obj.validateStep2()
 
-        // start step 2
-      
-       cy.log("======= Entring Data in step 2 ======")
-        step1Obj.validateStep2()
-      locationObj.enterCountry('USA');
-      cy.wrap('USA').as('country');
-      
-      locationObj.enterCity('Houston');
-      cy.wrap('Houston').as('city');
-      
-      locationObj.enterZipCode('77001');
-      cy.wrap('77001').as('zipCode');
-      
-     
+  // start step 2
+        cy.log("======= Entring Data in step 2 ======")
+  step1Obj.validateStep2()
+locationObj.enterCountry('USA');
+cy.wrap('USA').as('country');
+
+locationObj.enterCity('Houston');
+cy.wrap('Houston').as('city');
+
+locationObj.enterZipCode('77001');
+cy.wrap('77001').as('zipCode');
+/*
+        cy.log("======= Uploading valid image ======")
+        locationObj.uploadValidImage()
+
+        locationObj.varifyUploadImage()
+        locationObj.validateMyLocation()
+        */
         locationObj.clickNextButton()
-      
-      // step 3 start
-      
-      cy.log("======= Entring Data in steps 3 ======")
-      cy.log("======= Selecting random Roof Structure Type ======")
-      roofObj.selectRandomStructureType()
-      
-      
-      cy.get('@structureType').then(val => {
-        cy.log("Selected:", val);
-      });
-      
-      cy.log("======= Selecting random  Roof Pitch ======")
-      
-      roofObj.selectRandomRoofPitch()
-      
-      cy.get('@roofPitch').then(val => {
-        cy.log("Selected:", val);
-      });
-      
-      cy.log("======= Entring Random number ======")
-      roofObj.enterRoofAge(faker.string.numeric(2))
-      
-      cy.get('@roofAge').then(val => {
-        cy.log("Selected:", val);
-      });
-      
-      roofObj.ClickNextButton()
-      // step 4 start
-      
+
+// step 3 start
+
+cy.log("======= Entring Data in steps 3 ======")
+cy.log("======= Selecting random Roof Structure Type ======")
+roofObj.selectRandomStructureType()
+
+cy.get('@structureType').then(val => {
+  cy.log("Selected:", val);
+});
+
+cy.log("======= Selecting random  Roof Pitch ======")
+
+roofObj.selectRandomRoofPitch()
+
+cy.get('@roofPitch').then(val => {
+  cy.log("Selected:", val);
+});
+
+
+cy.log("======= Entring Random number ======")
+roofObj.enterRoofAge(faker.string.numeric(2))
+
+cy.get('@roofAge').then(val => {
+  cy.log("Selected:", val);
+});
+
+roofObj.ClickNextButton()
+// step 4 start
+  
       cy.log("======= Entring Data in Step 4 ======")
       matObj.validateStage()
       matObj.validateTitle()
@@ -501,7 +511,7 @@ const projectName = generateShortUniqueCompanyName('Test3');
       cy.contains('Home').click({force: true})
       cy.wait(100)
    
-        //now create an other project for compair
+        //now create another project for comparison
 
           //  Enter and SAVE Project Name
            
@@ -510,8 +520,8 @@ const projectName = generateShortUniqueCompanyName('Test3');
               
  //  Enter and SAVE Project Name
 const projectName1 = generateShortUniqueCompanyName('Test3');
-     step1Obj.enterProjectName(projectName1)
-     cy.wrap(projectName1).as('savedProjectName2')
+  step1Obj.enterProjectName(projectName1)
+     cy.wrap(projectName1).as('savedProjectName')
   
 
         step1Obj.validateYourRole()
@@ -520,52 +530,55 @@ const projectName1 = generateShortUniqueCompanyName('Test3');
         step1Obj.clickNextButton()
         step1Obj.validateStep2()
 
-               
-                 // start step 2
-               
-                cy.log("======= Entring Data in step 2 ======")
-                 step1Obj.validateStep2()
-               locationObj.enterCountry('USA');
-               cy.wrap('USA').as('country1');
-               
-               locationObj.enterCity('Houston');
-               cy.wrap('Houston').as('city1');
-               
-               locationObj.enterZipCode('77001');
-               cy.wrap('77001').as('zipCode1');
-               
-              
-                 locationObj.clickNextButton()
-               
-               // step 3 start
-               
-               cy.log("======= Entring Data in steps 3 ======")
-               cy.log("======= Selecting random Roof Structure Type ======")
-               roofObj.selectRandomStructureType2()
-               
-               
-               cy.get('@structureType2').then(val => {
-                 cy.log("Selected:", val);
-               });
-               
-               cy.log("======= Selecting random  Roof Pitch ======")
-               
-               roofObj.selectRandomRoofPitch2()
-               
-               cy.get('@roofPitch2').then(val => {
-                 cy.log("Selected:", val);
-               });
-               
-               cy.log("======= Entring Random number ======")
-               roofObj.enterRoofAge2(faker.string.numeric(2))
-               
-               cy.get('@roofAge2').then(val => {
-                 cy.log("Selected:", val);
-               });
-               
-               roofObj.ClickNextButton()
-               // step 4 start
-               
+  // start step 2
+        cy.log("======= Entring Data in step 2 ======")
+  step1Obj.validateStep2()
+locationObj.enterCountry('USA');
+cy.wrap('USA').as('country');
+
+locationObj.enterCity('Houston');
+cy.wrap('Houston').as('city');
+
+locationObj.enterZipCode('77001');
+cy.wrap('77001').as('zipCode');
+/*
+        cy.log("======= Uploading valid image ======")
+        locationObj.uploadValidImage()
+
+        locationObj.varifyUploadImage()
+        locationObj.validateMyLocation()
+        */
+        locationObj.clickNextButton()
+
+// step 3 start
+
+cy.log("======= Entring Data in steps 3 ======")
+cy.log("======= Selecting random Roof Structure Type ======")
+roofObj.selectRandomStructureType()
+
+cy.get('@structureType').then(val => {
+  cy.log("Selected:", val);
+});
+
+cy.log("======= Selecting random  Roof Pitch ======")
+
+roofObj.selectRandomRoofPitch()
+
+cy.get('@roofPitch').then(val => {
+  cy.log("Selected:", val);
+});
+
+
+cy.log("======= Entring Random number ======")
+roofObj.enterRoofAge(faker.string.numeric(2))
+
+cy.get('@roofAge').then(val => {
+  cy.log("Selected:", val);
+});
+
+roofObj.ClickNextButton()
+// step 4 start
+             
                cy.log("======= Entring Data in Step 4 ======")
                matObj.validateStage()
                matObj.validateTitle()
