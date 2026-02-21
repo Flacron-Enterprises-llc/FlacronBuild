@@ -1,0 +1,26 @@
+{
+  "english": {
+    "title": "YOUR ROOF ASSESSMENT REPORT"
+  },
+  "spanish": {
+    "title": "SU INFORME DE EVALUACIÓN DEL TECHO"
+  },
+  "french": {
+    "title": "VOTRE RAPPORT D'ÉVALUATION DU TOIT"
+  },
+  "german": {
+    "title": "IHR DACHTESTBERICHT"
+  },
+  "italian": {
+    "title": "IL TUO RAPPORTO DI VALUTAZIONE DEL TETTO"
+  },
+  "portuguese": {
+    "title": "SEU RELATÓRIO DE AVALIAÇÃO DO TELHADO"
+  },
+  "chinese": {
+    "title": "您的屋顶评估报告"
+  },
+  "japanese": {
+    "title": "屋根評価レポート"
+  }
+}
