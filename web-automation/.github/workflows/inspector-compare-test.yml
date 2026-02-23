@@ -1,4 +1,4 @@
-name: inspector Compare test on Firefox
+name: inspector Compare test on Edge
 on:
   push:
     branches:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   project-run: 
-    name: Test inspector compare on Firefox browser
+    name: Test inspector compare on Edge browser
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -17,9 +17,9 @@ jobs:
         with:
           working-directory: web-automation
           # 1. Add the browser flag to your custom command
-          command: npm run test:inspector-compairPage-test -- --record --browser firefox
+          command: npm run test:inspector-compairPage-test -- --record --browser edge
           # 2. Specify the browser for the GitHub Action
-          browser: firefox
+          browser: edge
           record: true
         env:
           CYPRESS_RECORD_KEY: f84cd963-d926-4c10-af50-4863894cad86
