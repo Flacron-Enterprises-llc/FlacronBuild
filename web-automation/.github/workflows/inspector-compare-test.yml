@@ -5,7 +5,7 @@ on:
       - web-compairpage-test
 
 jobs:
-  project-run:
+  project-run: 
     name: Test inspector compare on Firefox browser
     runs-on: ubuntu-22.04
     steps:
