@@ -160,16 +160,18 @@ cy.wrap('77001').as('zipCode');
 
 cy.log("======= Entring Data in steps 3 ======")
 cy.log("======= Selecting random Roof Structure Type ======")
+    cy.wait(1000)
 roofObj.selectRandomStructureType()
+    cy.wait(1000)
 
 cy.get('@structureType').then(val => {
   cy.log("Selected:", val);
-});
+})cy.wait(1000);
 
 cy.log("======= Selecting random  Roof Pitch ======")
 
 roofObj.selectRandomRoofPitch()
-
+cy.wait(1000)
 cy.get('@roofPitch').then(val => {
   cy.log("Selected:", val);
 });
@@ -269,21 +271,22 @@ cy.wrap('77001').as('zipCode');
 
 cy.log("======= Entring Data in steps 3 ======")
 cy.log("======= Selecting random Roof Structure Type ======")
+    cy.wait(1000)
 roofObj.selectRandomStructureType()
-
+cy.wait(1000)
 cy.get('@structureType').then(val => {
   cy.log("Selected:", val);
 });
 
 cy.log("======= Selecting random  Roof Pitch ======")
-
+cy.wait(1000)
 roofObj.selectRandomRoofPitch()
-
+cy.wait(1000)
 cy.get('@roofPitch').then(val => {
   cy.log("Selected:", val);
 });
 
-
+cy.wait(1000)
 cy.log("======= Entring Random number ======")
 roofObj.enterRoofAge(faker.string.numeric(2))
 
@@ -438,32 +441,29 @@ cy.wrap('Houston').as('city');
 
 locationObj.enterZipCode('77001');
 cy.wrap('77001').as('zipCode');
-/*
-        cy.log("======= Uploading valid image ======")
-        locationObj.uploadValidImage()
 
-        locationObj.varifyUploadImage()
-        locationObj.validateMyLocation()
-        */
         locationObj.clickNextButton()
 
 // step 3 start
 
 cy.log("======= Entring Data in steps 3 ======")
 cy.log("======= Selecting random Roof Structure Type ======")
+    cy.wait(1000)
 roofObj.selectRandomStructureType()
+    cy.wait(1000)
 
 cy.get('@structureType').then(val => {
   cy.log("Selected:", val);
 });
-
+cy.wait(1000)
 cy.log("======= Selecting random  Roof Pitch ======")
-
+cy.wait(1000)
 roofObj.selectRandomRoofPitch()
-
+cy.wait(1000)
 cy.get('@roofPitch').then(val => {
   cy.log("Selected:", val);
 });
+    cy.wait(1000)
 
 
 cy.log("======= Entring Random number ======")
@@ -546,29 +546,24 @@ cy.wrap('Houston').as('city');
 
 locationObj.enterZipCode('77001');
 cy.wrap('77001').as('zipCode');
-/*
-        cy.log("======= Uploading valid image ======")
-        locationObj.uploadValidImage()
 
-        locationObj.varifyUploadImage()
-        locationObj.validateMyLocation()
-        */
         locationObj.clickNextButton()
 
 // step 3 start
 
 cy.log("======= Entring Data in steps 3 ======")
 cy.log("======= Selecting random Roof Structure Type ======")
+    cy.wait(1000)
 roofObj.selectRandomStructureType()
-
+cy.wait(1000)
 cy.get('@structureType').then(val => {
   cy.log("Selected:", val);
 });
-
+cy.wait(1000)
 cy.log("======= Selecting random  Roof Pitch ======")
-
+cy.wait(1000)
 roofObj.selectRandomRoofPitch()
-
+cy.wait(1000)
 cy.get('@roofPitch').then(val => {
   cy.log("Selected:", val);
 });
