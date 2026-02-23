@@ -6,7 +6,7 @@ on:
 
 jobs:
   project-run: 
-    name: Test inspector compare on Edge browser
+    name: Test inspector compare on Edge browser 
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
