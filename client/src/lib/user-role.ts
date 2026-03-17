@@ -126,6 +126,7 @@ export class UserRoleManager {
     }
     this.currentRole = null;
     this.currentSubscriptionId = null;
+    this.sessionOverrideRole = null;
     this.notifyListeners(null);
     this.unsubscribeSnapshot?.();
   }

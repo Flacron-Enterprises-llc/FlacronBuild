@@ -1116,13 +1116,23 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
             // Update form fields
             if (city) form.setValue('location.city', city, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
             if (country) form.setValue('location.country', country, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
-            if (zip) form.setValue('location.zipCode', zip, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+            if (zip) {
+              form.setValue('location.zipCode', zip, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+            }
 
-            toast({
-              title: "Location detected",
-              description: "Your location has been automatically filled in.",
-              variant: "default"
-            });
+            if (zip) {
+              toast({
+                title: "Location detected",
+                description: "Your location has been automatically filled in.",
+                variant: "default"
+              });
+            } else {
+              toast({
+                title: "Location detected (no ZIP code)",
+                description: "City and country were detected, but a ZIP / postal code is not available for this region. Please enter it manually.",
+                variant: "default"
+              });
+            }
           }
         } catch (error) {
           console.error('Geocoding error:', error);
@@ -2076,7 +2086,7 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
                                    <input
                                      type="checkbox"
                                      checked={field.value || false}
-                                     onChange={field.onChange}
+                                     onChange={(e) => field.onChange(e.target.checked)}
                                      className="h-4 w-4 text-primary"
                                    />
                                  </FormControl>

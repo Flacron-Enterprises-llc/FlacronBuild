@@ -310,7 +310,17 @@ function ProjectReportCard({ report, currentUser }: { report: any; currentUser: 
                 <ConditionalField label="Job Type" value={project.jobType} />
                 <ConditionalField label="Material Preference" value={project.materialPreference} />
                 <ConditionalField label="Worker Count" value={project.laborNeeds?.workerCount} />
-                <ConditionalField label="Steep Assist" value={project.laborNeeds?.steepAssist} formatter={(val) => val ? "Yes" : "No"} />
+                {/* Always render Steep Assist for contractors — it's a boolean so hasData(false) would hide it otherwise */}
+                <div className="flex justify-between border-b border-neutral-200 pb-1">
+                  <span className="font-semibold text-neutral-700">Steep Assist:</span>
+                  <span className="text-neutral-800">
+                    {project.laborNeeds?.steepAssist === true
+                      ? "Yes"
+                      : project.laborNeeds?.steepAssist === false
+                      ? "No"
+                      : "Not specified"}
+                  </span>
+                </div>
                 <ConditionalField label="Local Permit Required" value={project.localPermit} formatter={(val) => val ? "Yes" : "No"} />
               </>
             )}
@@ -320,13 +330,13 @@ function ProjectReportCard({ report, currentUser }: { report: any; currentUser: 
             {/* Roof Details */}
             <ConditionalField label="Roof Pitch" value={project.roofPitch} />
             <ConditionalField label="Material Layers" value={project.materialLayers} formatter={(val) => val.join(", ")} />
-            <ConditionalField label="Urgency" value={project.urgency} />
             
             {/* Homeowner-specific fields */}
             {project.userRole === 'homeowner' && (
               <>
                 <ConditionalField label="Homeowner Name" value={homeownerName} />
                 <ConditionalField label="Homeowner Email" value={homeownerEmail} />
+                <ConditionalField label="Urgency" value={project.urgency} />
                 <ConditionalField label="Budget Style" value={project.budgetStyle} />
               </>
             )}

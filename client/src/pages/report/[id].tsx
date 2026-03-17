@@ -175,7 +175,6 @@ export default function ReportDetailPage() {
             <InfoRow label="Drip Edge" value={formInput.dripEdge} formatter={(val) => val ? 'Yes' : 'No'} />
             <InfoRow label="Gutter Apron" value={formInput.gutterApron} formatter={(val) => val ? 'Yes' : 'No'} />
             <InfoRow label="Area" value={formInput.area} formatter={(val) => `${val.toLocaleString()} sq ft`} />
-            <InfoRow label="Urgency" value={formInput.urgency} />
             
             {/* Inspector-specific fields */}
             {role === 'inspector' && (
@@ -213,7 +212,17 @@ export default function ReportDetailPage() {
                 <InfoRow label="Job Type" value={formInput.jobType} />
                 <InfoRow label="Material Preference" value={formInput.materialPreference} />
                 <InfoRow label="Worker Count" value={formInput.laborNeeds?.workerCount} />
-                <InfoRow label="Steep Assist" value={formInput.laborNeeds?.steepAssist} formatter={(val) => val ? 'Yes' : 'No'} />
+                {/* Always render Steep Assist for contractors — boolean false would be hidden by hasData otherwise */}
+                <div className="flex mb-1 text-base">
+                  <span className="font-semibold w-48 text-neutral-700">Steep Assist:</span>
+                  <span className="text-neutral-900">
+                    {formInput.laborNeeds?.steepAssist === true
+                      ? 'Yes'
+                      : formInput.laborNeeds?.steepAssist === false
+                      ? 'No'
+                      : 'Not specified'}
+                  </span>
+                </div>
                 <InfoRow label="Local Permit Required" value={formInput.localPermit} formatter={(val) => val ? 'Yes' : 'No'} />
                 <InfoRow label="Line Items" value={formInput.lineItems} formatter={(val) => Array.isArray(val) ? val.join(', ') : val} />
               </>
@@ -224,6 +233,7 @@ export default function ReportDetailPage() {
               <>
                 <InfoRow label="Homeowner Name" value={homeownerName} />
                 <InfoRow label="Homeowner Email" value={homeownerEmail} />
+                <InfoRow label="Urgency" value={formInput.urgency} />
                 <InfoRow label="Budget Style" value={formInput.budgetStyle} />
               </>
             )}

@@ -5,6 +5,7 @@ import LoginDialog from "./login-dialog";
 import { auth, writeHiTest } from "@/lib/firebase";
 import { onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
 import { userRoleManager } from "@/lib/user-role";
+import { queryClient } from "@/lib/queryClient";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -36,7 +37,9 @@ export default function Header() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    userRoleManager.clearUserRole();
+    await userRoleManager.clearUserRole();
+    queryClient.clear();
+    navigate("/");
   };
 
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : "/";

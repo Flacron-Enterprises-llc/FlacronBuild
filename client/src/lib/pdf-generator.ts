@@ -3357,14 +3357,31 @@ function addInspectorReport(doc: jsPDF, project: any, estimate: any) {
   doc.setFont('helvetica', 'normal');
   if (project.slopeDamage && project.slopeDamage.length > 0) {
     project.slopeDamage.forEach((damage: any, index: number) => {
+      // Check if a new page is needed before each slope entry
+      if (y > 240) {
+        doc.addPage();
+        y = 20;
+        doc.saveGraphicsState && doc.saveGraphicsState();
+        if (doc.setGState && gState) doc.setGState(gState);
+        doc.setTextColor(255, 102, 0);
+        doc.setFontSize(48);
+        doc.text('FLACRONBUILD', 105, 148, { angle: 35, align: 'center' });
+        doc.restoreGraphicsState && doc.restoreGraphicsState();
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+      }
       doc.text(`${getLocalizedText('slope', preferredLanguage)} ${index + 1}: ${damage.slope || getLocalizedText('not_specified', preferredLanguage)}`, 20, y);
       y += 5;
       doc.text(`  ${getLocalizedText('damage_type', preferredLanguage)} ${damage.damageType || getLocalizedText('not_specified', preferredLanguage)}`, 25, y);
-              y += 5;
+      y += 5;
       doc.text(`  ${getLocalizedText('severity', preferredLanguage)} ${damage.severity || getLocalizedText('not_specified', preferredLanguage)}`, 25, y);
-            y += 5;
-      doc.text(`  ${getLocalizedText('description', preferredLanguage)} ${damage.description || getLocalizedText('no_description', preferredLanguage)}`, 25, y, { maxWidth: 140 });
-      y += 8;
+      y += 5;
+      // Calculate actual height of wrapped description text to prevent overlap
+      const descText = `  ${getLocalizedText('description', preferredLanguage)} ${damage.description || getLocalizedText('no_description', preferredLanguage)}`;
+      const descLines = doc.splitTextToSize(descText, 140);
+      doc.text(descLines, 25, y);
+      y += descLines.length * 5 + 4;
     });
   } else {
     doc.text(getLocalizedText('no_slope_damage', preferredLanguage), 20, y);
