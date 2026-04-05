@@ -1,6 +1,6 @@
 name: Contractor Create Project test on Edge browser
 on:
-  push:
+  push: 
     branches:
       - web-createproject-test
 
