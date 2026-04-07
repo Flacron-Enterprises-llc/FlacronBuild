@@ -313,12 +313,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
       console.error("Full error:", error);
       
-      // Return more detailed error information in development
       const errorMessage = error instanceof Error ? error.message : String(error);
       const isDevelopment = process.env.NODE_ENV === 'development';
+
+      // Provide user-friendly, specific error messages
+      let userMessage = "Failed to generate estimate. Please try again.";
+      let retryable = true;
+
+      if (errorMessage.includes('Rate limit')) {
+        userMessage = "The AI service is temporarily busy (rate limit reached). Please wait a moment and try again.";
+      } else if (errorMessage.includes('Invalid OpenAI API key') || errorMessage.includes('Invalid API key')) {
+        userMessage = "API configuration error: Invalid OpenAI API key. Please contact support.";
+        retryable = false;
+      } else if (errorMessage.includes('OpenAI server error') || errorMessage.includes('IBM Watsonx')) {
+        userMessage = "The AI service encountered a server error. We already retried — please try again in a few minutes.";
+      } else if (errorMessage.includes('Network error') || errorMessage.includes('Failed to reach') || errorMessage.includes('internet connection')) {
+        userMessage = "Network error while contacting AI service. Please check your connection and try again.";
+      } else if (errorMessage.includes('empty response')) {
+        userMessage = "The AI returned an incomplete response after retrying. Please try again.";
+      } else if (errorMessage.includes('Invalid input')) {
+        userMessage = `Validation error: ${errorMessage}`;
+        retryable = false;
+      } else if (errorMessage.includes('API key is not configured')) {
+        userMessage = "AI service is not configured. Please contact support.";
+        retryable = false;
+      }
       
       res.status(500).json({ 
-        message: "Failed to generate estimate",
+        message: userMessage,
+        retryable,
         error: isDevelopment ? errorMessage : undefined,
         details: isDevelopment && error instanceof Error ? error.stack : undefined
       });

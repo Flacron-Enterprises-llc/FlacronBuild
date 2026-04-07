@@ -819,13 +819,39 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
         setIsEstimating(false);
       }
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('=== FRONTEND: Estimate Generation Error ===');
       console.error('Error:', error);
       setIsEstimating(false);
+
+      // Parse backend error response for specific messages
+      let title = "Estimate Failed";
+      let description = "Failed to generate estimate. Please try again.";
+
+      try {
+        const errBody = error?.response ? JSON.parse(error.response) : error;
+        if (errBody?.message) {
+          description = errBody.message;
+        }
+        if (errBody?.retryable === false) {
+          title = "Configuration Error";
+        } else if (
+          description.toLowerCase().includes('rate limit') ||
+          description.toLowerCase().includes('busy') ||
+          description.toLowerCase().includes('server error') ||
+          description.toLowerCase().includes('retrying')
+        ) {
+          title = "Retrying — AI Service Busy";
+        } else if (description.toLowerCase().includes('network') || description.toLowerCase().includes('connection')) {
+          title = "Network Error";
+        }
+      } catch {
+        // use defaults
+      }
+
       toast({
-        title: "Error",
-        description: "Failed to generate estimate. Please try again.",
+        title,
+        description,
         variant: "destructive",
       });
     }
@@ -834,9 +860,20 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const maxSize = 10 * 1024 * 1024; // 10MB
-    const validFiles = files.filter(file => file.size <= maxSize);
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+
+    const typeFilteredFiles = files.filter(file => allowedTypes.includes(file.type));
+    if (typeFilteredFiles.length !== files.length) {
+      toast({
+        title: "Invalid file format",
+        description: "Only JPEG and PNG images are allowed. Other file types have been removed.",
+        variant: "destructive",
+      });
+    }
+
+    const validFiles = typeFilteredFiles.filter(file => file.size <= maxSize);
     
-    if (validFiles.length !== files.length) {
+    if (validFiles.length !== typeFilteredFiles.length) {
       toast({
         title: "File size limit exceeded",
         description: "Some files were too large (max 10MB per file).",
@@ -941,12 +978,46 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
   // Map each step to the fields that should be validated
   const stepFields: Record<number, (keyof ProjectFormData)[]> = {
     1: ["name", "userRole", "projectType"],
-    2: ["location"], // Validate the whole location object
+    2: ["location"],
     3: ["structureType", "roofPitch", "roofAge", "area"],
     4: ["materialLayers", "felt", "iceWaterShield", "dripEdge", "gutterApron"],
-    // Step 5 and 6 are role-specific or review, so skip validation here
-    5: [], // Role-specific fields - validated separately
-    6: [], // Review step - final validation in onSubmit
+    5: ["preferredLanguage", "preferredCurrency"],
+    6: [],
+  };
+
+  const validateStep5 = (): { valid: boolean; missing: string[] } => {
+    const formData = form.getValues();
+    const role = formData.userRole;
+    const missing: string[] = [];
+
+    if (!formData.preferredLanguage) missing.push('Preferred Language');
+    if (!formData.preferredCurrency) missing.push('Preferred Currency');
+
+    if (role === 'inspector') {
+      if (!formData.inspectorInfo?.name?.trim()) missing.push('Inspector Name');
+      if (!formData.inspectorInfo?.license?.trim()) missing.push('License Number');
+      if (!formData.inspectorInfo?.contact?.trim()) missing.push('Contact (email or phone)');
+      if (!formData.inspectionDate) missing.push('Inspection Date');
+      if (!formData.weatherConditions) missing.push('Weather Conditions');
+    } else if (role === 'insurance-adjuster') {
+      if (!formData.claimNumber?.trim()) missing.push('Claim Number');
+      if (!formData.policyholderName?.trim()) missing.push('Policyholder Name');
+      if (!formData.adjusterName?.trim()) missing.push('Adjuster Name');
+      if (!formData.adjusterContact?.trim()) missing.push('Adjuster Contact');
+      if (!formData.dateOfLoss) missing.push('Date of Loss');
+      if (!formData.damageCause?.trim()) missing.push('Cause of Damage');
+    } else if (role === 'contractor') {
+      if (!formData.jobType) missing.push('Job Type');
+      if (!formData.materialPreference) missing.push('Material Preference');
+      if (!formData.laborNeeds?.workerCount) missing.push('Worker Count');
+    } else if (role === 'homeowner') {
+      if (!formData.homeownerInfo?.name?.trim()) missing.push('Your Name');
+      if (!formData.homeownerInfo?.email?.trim()) missing.push('Your Email');
+      if (!formData.urgency) missing.push('Urgency Level');
+      if (!formData.budgetStyle) missing.push('Budget Style');
+    }
+
+    return { valid: missing.length === 0, missing };
   };
 
   const handleNext = async () => {
@@ -954,6 +1025,19 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
     const isValid = fieldsToValidate.length > 0 ? await form.trigger(fieldsToValidate as any) : true;
     console.log('Next clicked. Validation result:', isValid);
     console.log('Current form values:', form.getValues());
+
+    if (currentStep === 5) {
+      const { valid, missing } = validateStep5();
+      if (!valid) {
+        toast({
+          title: "Required Fields Missing",
+          description: `Please fill in: ${missing.join(', ')}`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     if (isValid && currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
     }
@@ -1346,10 +1430,10 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
                     >
                     <Upload className="mx-auto text-neutral-400 h-8 w-8 mb-2" />
                       <p className="text-sm text-neutral-600">Drop images here or click to browse</p>
-                    <p className="text-xs text-neutral-500 mt-1">Max 10MB per file</p>
+                    <p className="text-xs text-neutral-500 mt-1">JPEG and PNG only · Max 10MB per file</p>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/png"
                         multiple
                         ref={fileInputRef}
                         style={{ display: "none" }}

@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import fetch from 'node-fetch';
 
 export interface RealCostData {
@@ -66,6 +66,7 @@ interface OpenAIResponse {
 // Real-time data sources for construction costs
 export class RealCostCalculator {
   private openaiApiKey: string;
+  private geminiApiKey: string;
   private watsonxApiKey: string;
   private watsonxUrl: string;
   private watsonxProjectId: string | undefined;
@@ -73,30 +74,45 @@ export class RealCostCalculator {
   private watsonxModelId: string;
 
   constructor() {
+    const sep = '='.repeat(60);
+    console.log(`\n${sep}`);
+    console.log('    FlacronBuild AI Cost Calculator  Initializing');
+    console.log(`${sep}`);
+    console.log('  PRIMARY   : OpenAI GPT-4o    cost calculations');
+    console.log('  PRIMARY   : IBM Watsonx       report narrative');
+    console.log('  FALLBACK  : Google Gemini     if either primary fails');
+    console.log(`${sep}`);
+
     this.openaiApiKey = process.env.OPENAI_KEY || process.env.OPENAI_API_KEY || '';
     if (!this.openaiApiKey) {
-      console.error('⚠️ CRITICAL: OpenAI API key is not set. Set OPENAI_KEY or OPENAI_API_KEY in environment variables.');
+      console.error('    OpenAI API key  : NOT SET  (OPENAI_KEY / OPENAI_API_KEY)');
     } else {
-      console.log('✅ OpenAI API key found:', this.openaiApiKey.slice(0, 8) + '...');
+      console.log(`    OpenAI API key  : ${this.openaiApiKey.slice(0, 10)}...  (GPT-4o)`);
+    }
+
+    this.geminiApiKey = process.env.GEMINI_KEY || '';
+    if (!this.geminiApiKey) {
+      console.warn('    Gemini API key  : NOT SET  (GEMINI_KEY)  no fallback available');
+    } else {
+      console.log(`    Gemini API key  : ${this.geminiApiKey.slice(0, 10)}...  (gemini-2.5-flash)`);
     }
     
     this.watsonxApiKey = process.env.IBM_WATSONX_AI_API_KEY || '';
     this.watsonxUrl = process.env.IBM_WATSONX_AI_URL || 'https://us-south.ml.cloud.ibm.com';
     this.watsonxProjectId = process.env.IBM_WATSONX_AI_PROJECT_ID;
     this.watsonxSpaceId = process.env.IBM_WATSONX_AI_SPACE_ID;
-    this.watsonxModelId = process.env.IBM_WATSONX_AI_MODEL_ID || 'ibm/granite-4-h-small';
+    this.watsonxModelId = process.env.IBM_WATSONX_AI_MODEL_ID || 'ibm/granite-3-8b-instruct';
     
     if (!this.watsonxApiKey) {
-      console.error('⚠️ CRITICAL: IBM Watsonx API key is not set. Set IBM_WATSONX_AI_API_KEY in environment variables.');
+      console.error('    Watsonx API key : NOT SET  (IBM_WATSONX_AI_API_KEY)');
     } else {
-      console.log('✅ IBM Watsonx API key found:', this.watsonxApiKey.slice(0, 8) + '...');
-      if (this.watsonxProjectId) {
-        console.log('✅ IBM Watsonx Project ID found:', this.watsonxProjectId.slice(0, 8) + '...');
-      }
-      if (this.watsonxSpaceId) {
-        console.log('✅ IBM Watsonx Space ID found:', this.watsonxSpaceId.slice(0, 8) + '...');
-      }
+      console.log(`    Watsonx API key : ${this.watsonxApiKey.slice(0, 10)}...`);
+      console.log(`    Watsonx model   : ${this.watsonxModelId}`);
+      console.log(`    Watsonx URL     : ${this.watsonxUrl}`);
+      console.log(`    Project ID      : ${this.watsonxProjectId || '(not set)'}`);
+      console.log(`    Space ID        : ${this.watsonxSpaceId || '(not set)'}`);
     }
+    console.log(`${sep}\n`);
   }
 
   async calculateRealCost(project: ProjectRequirements, imageUrls?: string[]): Promise<any> {
@@ -212,8 +228,8 @@ export class RealCostCalculator {
         throw new Error(`Failed to build prompts for role ${userRole}: ${promptError instanceof Error ? promptError.message : String(promptError)}`);
       }
 
-      // Step 1: Get calculations from OpenAI
-      console.log('=== COST CALCULATOR: Step 1 - Calling OpenAI for Calculations ===');
+      // Step 1: Get calculations from OpenAI (Gemini fallback)
+      console.log('=== COST CALCULATOR: Step 1 - Calling OpenAI GPT-4o for Calculations ===');
       const calculationMessages: any[] = [
         {
           role: 'system',
@@ -252,45 +268,64 @@ export class RealCostCalculator {
       }
 
       const startTime = Date.now();
-      const openaiResponse = await this.queryOpenAI(calculationMessages);
-      const openaiEndTime = Date.now();
-      console.log('=== COST CALCULATOR: OpenAI Response Received ===');
-      console.log('Response time:', openaiEndTime - startTime, 'ms');
-      
+      let openaiRawResponse: string;
+      let calcSource = 'OpenAI GPT-4o';
+      try {
+        openaiRawResponse = await this.queryOpenAI(calculationMessages);
+        const openaiEndTime = Date.now();
+        console.log(`\n  OpenAI responded in ${openaiEndTime - startTime}ms  parsing calculations...`);
+      } catch (openaiErr) {
+        const openaiErrMsg = openaiErr instanceof Error ? openaiErr.message : String(openaiErr);
+        const bar = '-'.repeat(60);
+        console.error(`\n${bar}`);
+        console.error('  OPENAI FAILED  SWITCHING TO GEMINI FOR CALCULATIONS');
+        console.error(`   Reason : ${openaiErrMsg}`);
+        console.error(`${bar}\n`);
+        if (!this.geminiApiKey) {
+          throw new Error(`OpenAI failed and no Gemini API key is configured. OpenAI error: ${openaiErrMsg}`);
+        }
+        calcSource = 'Gemini (OpenAI fallback)';
+        try {
+          openaiRawResponse = await this.queryGemini(calculationPrompt);
+          console.log(`\n  Gemini fallback responded  parsing calculations...`);
+        } catch (geminiErr) {
+          const geminiErrMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+          const bar2 = '-'.repeat(60);
+          console.error(`\n${bar2}`);
+          console.error('  GEMINI ALSO FAILED FOR CALCULATIONS  no fallback remaining');
+          console.error(`   OpenAI : ${openaiErrMsg}`);
+          console.error(`   Gemini : ${geminiErrMsg}`);
+          console.error(`${bar2}\n`);
+          throw new Error(`Both OpenAI and Gemini failed for cost calculations. OpenAI: ${openaiErrMsg}. Gemini: ${geminiErrMsg}`);
+        }
+      }
+
       let calculationJson: any;
       try {
-        let cleanResponse = openaiResponse.trim();
-        if (cleanResponse.startsWith('```json')) {
-          cleanResponse = cleanResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-        }
-        if (cleanResponse.startsWith('```')) {
-          cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        }
+        let cleanResponse = openaiRawResponse.trim();
+        cleanResponse = cleanResponse.replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '');
+        cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) cleanResponse = jsonMatch[0];
         cleanResponse = cleanResponse.replace(/("estimatedDays":\s*)(\d+-\d+)([,\s}])/g, '$1"$2"$3');
         
         calculationJson = JSON.parse(cleanResponse);
         
-        // Check for error response from OpenAI
         if (calculationJson.error) {
-          console.log('=== COST CALCULATOR: OpenAI returned error ===');
-          console.log('Error:', calculationJson.error);
           throw new Error(calculationJson.error);
         }
         
-        console.log('=== COST CALCULATOR: Calculation JSON Parsed Successfully ===');
-        console.log('Materials cost:', calculationJson.materialsCost);
-        console.log('Labor cost:', calculationJson.laborCost);
-        console.log('Permits cost:', calculationJson.permitsCost);
-        
+        console.log(`  Calculations parsed successfully  |  Source: ${calcSource}`);
+        console.log(`   Materials : $${calculationJson.materialsCost || calculationJson.costEstimates?.materials?.total || 0}`);
+        console.log(`   Labor     : $${calculationJson.laborCost || calculationJson.costEstimates?.labor?.total || 0}`);
+        console.log(`   Permits   : $${calculationJson.permitsCost || 0}`);
       } catch (e) {
-        // If the error is from our validation check, re-throw it as-is
         if (e instanceof Error && (e.message.includes('Invalid input') || e.message.includes('Validation'))) {
           throw e;
         }
-        // Otherwise it's a JSON parse error
-        console.log('=== COST CALCULATOR: JSON Parse Error ===');
-        console.log('Parse error:', e);
-        throw new Error("OpenAI did not return valid JSON: " + openaiResponse);
+        console.error(`  JSON parse failed for calculations (source: ${calcSource})`);
+        console.error('   Raw response:', openaiRawResponse.substring(0, 300));
+        throw new Error(`${calcSource} did not return valid JSON for calculations: ${e instanceof Error ? e.message : e}`);
       }
 
       // Step 2: Get report text from IBM Watsonx
@@ -314,99 +349,98 @@ export class RealCostCalculator {
       const reportPromptWithCalculations = reportPrompt + '\n\nUSE THESE CALCULATION RESULTS FROM OPENAI:\n' + JSON.stringify(calculationResults, null, 2) + '\n\nGenerate a professional contractor report in JSON format using these exact cost values. Return ONLY valid JSON starting with { and ending with }.';
       
       let watsonxReportText: string;
+      let reportSource = 'IBM Watsonx';
       try {
         watsonxReportText = await this.queryWatsonx(reportPromptWithCalculations);
+        const watsonEndTime = Date.now();
+        // Treat empty / minimal / non-JSON-looking responses as failures
+        const cleaned = watsonxReportText.trim();
+        if (!cleaned || cleaned === '<end_of_turn>' || cleaned.length < 20 || !cleaned.includes('{')) {
+          throw new Error(`Watsonx returned empty or non-JSON response (${cleaned.length} chars: "${cleaned.substring(0, 60)}")`);
+        }
+        console.log(`\n  Watsonx responded in ${watsonEndTime - watsonStartTime}ms  parsing report...`);
       } catch (watsonxError) {
-        console.log('=== COST CALCULATOR: Watsonx call failed, using fallback ===');
-        console.log('Error:', watsonxError instanceof Error ? watsonxError.message : String(watsonxError));
-        watsonxReportText = ''; // Empty string will trigger fallback
+        const watsonErrMsg = watsonxError instanceof Error ? watsonxError.message : String(watsonxError);
+        const bar = '-'.repeat(60);
+        console.error(`\n${bar}`);
+        console.error('  WATSONX FAILED  SWITCHING TO GEMINI FOR REPORT GENERATION');
+        console.error(`   Reason : ${watsonErrMsg}`);
+        console.error(`${bar}\n`);
+        if (!this.geminiApiKey) {
+          throw new Error(`Watsonx failed and no Gemini API key is configured. Watsonx error: ${watsonErrMsg}`);
+        }
+        reportSource = 'Gemini (Watsonx fallback)';
+        try {
+          watsonxReportText = await this.queryGemini(reportPromptWithCalculations);
+          console.log(`\n  Gemini fallback responded  parsing report...`);
+        } catch (geminiErr) {
+          const geminiErrMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+          const bar2 = '-'.repeat(60);
+          console.error(`\n${bar2}`);
+          console.error('  GEMINI ALSO FAILED FOR REPORT  no fallback remaining');
+          console.error(`   Watsonx : ${watsonErrMsg}`);
+          console.error(`   Gemini  : ${geminiErrMsg}`);
+          console.error(`${bar2}\n`);
+          throw new Error(`Both Watsonx and Gemini failed for report generation. Watsonx: ${watsonErrMsg}. Gemini: ${geminiErrMsg}`);
+        }
       }
-      const watsonEndTime = Date.now();
-      console.log('=== COST CALCULATOR: IBM Watsonx Response Received ===');
-      console.log('Response time:', watsonEndTime - watsonStartTime, 'ms');
       
+      const parseReportJson = (raw: string): any => {
+        let clean = raw.trim();
+        clean = clean.replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '');
+        clean = clean.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        // Strip anything before the first { and after the last }
+        const start = clean.indexOf('{');
+        const end = clean.lastIndexOf('}');
+        if (start !== -1 && end !== -1 && end > start) {
+          clean = clean.substring(start, end + 1);
+        }
+        clean = clean.replace(/^const\s+\w+\s*=\s*/, '').replace(/;\s*$/, '');
+        return JSON.parse(clean);
+      };
+
+      const mergeCostsIntoReport = (rj: any) => {
+        rj.materialsCost = calculationJson.materialsCost || calculationJson.costEstimates?.materials?.total || 0;
+        rj.laborCost     = calculationJson.laborCost     || calculationJson.costEstimates?.labor?.total    || 0;
+        rj.permitsCost   = calculationJson.permitsCost   || 0;
+        if (calculationJson.costEstimates) rj.costEstimates = calculationJson.costEstimates;
+        rj.contingencyCost = calculationJson.contingencyCost;
+        rj.imageAnalysis   = calculationJson.imageAnalysis || [];
+      };
+
       let reportJson: any;
       try {
-        let cleanReportResponse = watsonxReportText.trim();
-        
-        // If response is just <end_of_turn> or empty, create a basic report structure from OpenAI calculations
-        if (!cleanReportResponse || cleanReportResponse === '<end_of_turn>' || cleanReportResponse.length < 10) {
-          console.log('=== COST CALCULATOR: Watsonx returned empty/minimal response, creating basic report structure from OpenAI calculations ===');
-          // Create a basic report structure - Watsonx failed but we have OpenAI calculations
-          reportJson = {
-            projectDetails: {
-              address: `${project.location?.city || ''}, ${project.location?.state || ''} ${project.location?.zip || ''}`,
-              type: project.projectType || 'Residential',
-              dimensions: {
-                totalArea: project.area || 1200,
-                pitch: project.roofPitch || 'Not specified'
-              }
-            },
-            scopeOfWork: {
-              preparationTasks: ['Site assessment', 'Material delivery', 'Permits'],
-              removalTasks: ['Remove existing roofing materials'],
-              installationTasks: ['Install new roofing system'],
-              finishingTasks: ['Site cleanup', 'Final inspection']
-            },
-            materialBreakdown: {
-              lineItems: project.lineItems || []
-            },
-            timeline: '5-7 business days',
-            contingencySuggestions: 'Standard contingency included',
-            note: 'Report generated from cost calculations'
-          };
-        } else {
-          // Remove safety/risk definition text that Watsonx sometimes adds
-          if (cleanReportResponse.includes('<end_of_turn>')) {
-            const jsonStart = cleanReportResponse.indexOf('{');
-            const jsonEnd = cleanReportResponse.lastIndexOf('}');
-            if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-              cleanReportResponse = cleanReportResponse.substring(jsonStart, jsonEnd + 1);
-            } else {
-              // If no JSON found, try to extract from after <end_of_turn>
-              const afterEndTurn = cleanReportResponse.split('<end_of_turn>')[1] || cleanReportResponse.split('<end_of_turn>')[0];
-              const jsonMatch = afterEndTurn.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                cleanReportResponse = jsonMatch[0];
-              }
-            }
-          }
-          
-          // Remove markdown code blocks if present (including ```js, ```json, etc.)
-          cleanReportResponse = cleanReportResponse.replace(/^```[a-z]*\s*/i, '').replace(/\s*```\s*$/i, '');
-          
-          // Extract JSON if it's embedded in text - be more aggressive
-          const jsonMatch = cleanReportResponse.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            cleanReportResponse = jsonMatch[0];
-          }
-          
-          // Clean up any remaining markdown or code syntax
-          cleanReportResponse = cleanReportResponse.replace(/^const\s+\w+\s*=\s*/, '').replace(/;\s*$/, '');
-          
-          reportJson = JSON.parse(cleanReportResponse);
+        reportJson = parseReportJson(watsonxReportText);
+        mergeCostsIntoReport(reportJson);
+        console.log(`\n  Report JSON parsed  |  source: ${reportSource}`);
+        console.log(`   Report keys: ${Object.keys(reportJson).join(', ')}`);
+      } catch (parseErr) {
+        const parseErrMsg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+        const bar = '-'.repeat(60);
+        console.error(`\n${bar}`);
+        console.error(`  REPORT JSON PARSE FAILED  (source: ${reportSource})`);
+        console.error(`   Error   : ${parseErrMsg}`);
+        console.error(`   Raw (300): ${watsonxReportText.substring(0, 300)}`);
+        console.error(`${bar}\n`);
+        if (!this.geminiApiKey) {
+          throw new Error(`Report JSON parse failed and no Gemini fallback configured. Parse error: ${parseErrMsg}`);
         }
-        console.log('=== COST CALCULATOR: Report JSON Parsed Successfully ===');
-        console.log('Report JSON keys:', Object.keys(reportJson));
-        
-        // Merge calculation results into report
-        reportJson.materialsCost = calculationJson.materialsCost || calculationJson.costEstimates?.materials?.total || 0;
-        reportJson.laborCost = calculationJson.laborCost || calculationJson.costEstimates?.labor?.total || 0;
-        reportJson.permitsCost = calculationJson.permitsCost || 0;
-        if (calculationJson.costEstimates) {
-          reportJson.costEstimates = calculationJson.costEstimates;
+        console.log('     Asking Gemini to regenerate report JSON...');
+        try {
+          const geminiRetryText = await this.queryGemini(reportPromptWithCalculations);
+          reportJson = parseReportJson(geminiRetryText);
+          mergeCostsIntoReport(reportJson);
+          reportSource = 'Gemini (parse-error retry)';
+          console.log(`\n  Gemini regenerated valid report JSON  |  keys: ${Object.keys(reportJson).join(', ')}`);
+        } catch (geminiRetryErr) {
+          const geminiRetryErrMsg = geminiRetryErr instanceof Error ? geminiRetryErr.message : String(geminiRetryErr);
+          console.error(`\n${bar}`);
+          console.error('  GEMINI REGENERATION ALSO FAILED  cannot produce report');
+          console.error(`   ${geminiRetryErrMsg}`);
+          console.error(`${bar}\n`);
+          throw new Error(`All attempts to generate report JSON failed. Last error: ${geminiRetryErrMsg}`);
         }
-        reportJson.contingencyCost = calculationJson.contingencyCost;
-        reportJson.imageAnalysis = calculationJson.imageAnalysis || [];
-      } catch (e) {
-        console.log('=== COST CALCULATOR: Report JSON Parse Error ===');
-        console.log('Parse error:', e);
-        console.log('Raw response:', watsonxReportText.substring(0, 500));
-        // Fallback here is only for JSON parsing issues, not for skipping Watsonx.
-        reportJson = {
-          ...calculationJson,
-          error: 'Failed to parse Watsonx JSON response; using calculation data only'
-        };
+        // All LLM fallbacks handled above via Gemini  no hardcoded report data.
       }
       
       // Compose the breakdown and return
@@ -450,64 +484,64 @@ export class RealCostCalculator {
       console.log('Final result size:', JSON.stringify(finalResult).length, 'characters');
       
       return finalResult;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('=== COST CALCULATOR: Error ===');
-      console.error('Error type:', error.constructor.name);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error('Error type:', err.constructor.name);
+      console.error('Error message:', err.message);
+      console.error('Error stack:', err.stack);
       
-      // Provide more helpful error messages
-      if (error.message.includes('429')) {
-        throw new Error('Rate limit exceeded. Please try again in a few minutes.');
-      } else if (error.message.includes('401') || error.message.includes('403')) {
-        throw new Error('Invalid OpenAI API key. Please check your configuration.');
-      } else if (error.message.includes('Failed to fetch')) {
-        throw new Error('Network error while contacting OpenAI API. Please check your internet connection.');
-      } else {
-        throw new Error(`Failed to generate estimate: ${error.message}`);
+      // Re-throw already-meaningful errors from retry logic
+      if (
+        err.message.includes('Rate limit') ||
+        err.message.includes('Invalid OpenAI API key') ||
+        err.message.includes('Invalid API key') ||
+        err.message.includes('OpenAI server error') ||
+        err.message.includes('IBM Watsonx') ||
+        err.message.includes('Network error') ||
+        err.message.includes('Failed to reach') ||
+        err.message.includes('empty response') ||
+        err.message.includes('API key is not configured') ||
+        err.message.includes('Invalid input')
+      ) {
+        throw err;
       }
+      
+      throw new Error(`Failed to generate estimate: ${err.message}`);
     }
   }
 
-  private async queryOpenAI(messages: any[]): Promise<string> {
+  private async queryOpenAI(messages: any[], retryCount = 0): Promise<string> {
     if (!this.openaiApiKey) {
       throw new Error('OpenAI API key is not configured');
     }
 
+    const maxRetries = 3;
     const url = 'https://api.openai.com/v1/chat/completions';
-    
-    console.log('\n=== OPENAI API: Request Details ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('Request messages count:', messages.length);
-    console.log('\n=== System Message ===');
-    console.log(messages[0]?.content);
-    console.log('\n=== User Message Preview ===');
-    const userMessage = messages.find(m => m.role === 'user');
-    if (userMessage) {
-      if (typeof userMessage.content === 'string') {
-        console.log(userMessage.content.substring(0, 500) + '...');
-      } else {
-        console.log('Content type:', typeof userMessage.content);
-      }
-    }
+
+    const separator = '-'.repeat(80);
+    console.log(`\n${separator}`);
+    console.log('  OPENAI GPT-4o  |  PROMPT SENT');
+    console.log(`${separator}`);
+    console.log(`  Timestamp : ${new Date().toISOString()}`);
+    console.log(`  Attempt   : ${retryCount + 1} / ${maxRetries}`);
+    console.log(`  Messages  : ${messages.length}`);
+    messages.forEach((msg, i) => {
+      const content = typeof msg.content === 'string' ? msg.content : '[image/multi-part content]';
+      console.log(`\n  [Message ${i + 1}] role=${msg.role}`);
+      console.log('  ' + content.substring(0, 1500) + (content.length > 1500 ? '\n  ...(truncated)' : ''));
+    });
+    console.log(`${separator}`);
 
     const requestBody = {
-      model: 'gpt-4o', // Using GPT-4o for better JSON generation
+      model: 'gpt-4o',
       messages: messages,
-      temperature: 0.3, // Lower temperature for more consistent JSON output
-      response_format: { type: 'json_object' } // Force JSON response
+      temperature: 0.3,
+      response_format: { type: 'json_object' }
     };
-
-    console.log('\n=== Request Structure ===');
-    console.log(JSON.stringify({
-      model: requestBody.model,
-      messages_count: messages.length,
-      temperature: requestBody.temperature,
-      response_format: requestBody.response_format
-    }, null, 2));
     
     try {
-      console.log('\n=== Making API Request ===');
+      console.log('\n  Sending request to OpenAI...');
       const startTime = Date.now();
       
       const response = await fetch(url, {
@@ -520,22 +554,37 @@ export class RealCostCalculator {
       });
 
       const endTime = Date.now();
-      console.log('\n=== API Response ===');
-      console.log('Response time:', endTime - startTime, 'ms');
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      console.log(`  OpenAI responded in ${endTime - startTime}ms  |  HTTP ${response.status}`);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('OpenAI API error response:', errorText);
+        console.error(`  OpenAI error response: ${errorText}`);
+
+        if (response.status === 429) {
+          if (retryCount < maxRetries - 1) {
+            const delay = Math.pow(2, retryCount) * 2000;
+            console.log(`Rate limited. Retrying in ${delay}ms... (attempt ${retryCount + 2}/${maxRetries})`);
+            await new Promise(res => setTimeout(res, delay));
+            return this.queryOpenAI(messages, retryCount + 1);
+          }
+          throw new Error('Rate limit exceeded after multiple retries. Please try again in a few minutes.');
+        }
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Invalid OpenAI API key. Please check your configuration.');
+        }
+        if (response.status >= 500) {
+          if (retryCount < maxRetries - 1) {
+            const delay = Math.pow(2, retryCount) * 1500;
+            console.log(`OpenAI server error (${response.status}). Retrying in ${delay}ms... (attempt ${retryCount + 2}/${maxRetries})`);
+            await new Promise(res => setTimeout(res, delay));
+            return this.queryOpenAI(messages, retryCount + 1);
+          }
+          throw new Error(`OpenAI server error (${response.status}). Please try again later.`);
+        }
         throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json() as OpenAIResponse;
-      console.log('\n=== Response Data ===');
-      if (typeof data === 'object' && data !== null) {
-        console.log('Response structure:', Object.keys(data));
-      }
       
       if (data.error) {
         console.error('OpenAI API error:', data.error);
@@ -543,29 +592,50 @@ export class RealCostCalculator {
       }
       
       if (!data?.choices?.[0]?.message?.content) {
-        console.error('Unexpected OpenAI response structure:', JSON.stringify(data, null, 2));
-        throw new Error('Invalid response format from OpenAI API');
+        if (retryCount < maxRetries - 1) {
+          console.log(`Empty OpenAI response. Retrying... (attempt ${retryCount + 2}/${maxRetries})`);
+          await new Promise(res => setTimeout(res, 1000));
+          return this.queryOpenAI(messages, retryCount + 1);
+        }
+        throw new Error('OpenAI returned an empty response after multiple retries.');
       }
 
       const responseText = data.choices[0].message.content;
-      console.log('\n=== Response Text Preview ===');
-      console.log(responseText.substring(0, 500) + '...');
+
+      const sep2 = '-'.repeat(80);
+      console.log(`\n${sep2}`);
+      console.log('  OPENAI GPT-4o  |  RESPONSE RECEIVED');
+      console.log(`${sep2}`);
+      console.log(`   Response time : ${endTime - startTime}ms`);
+      console.log(`  Length        : ${responseText.length} characters`);
+      console.log('\n  Full response:\n');
+      console.log(responseText);
+      console.log(`${sep2}`);
 
       return responseText;
     } catch (error: unknown) {
       console.error('\n=== OPENAI API: Request Failed ===');
       if (error instanceof Error) {
-        console.error('Error type:', error.constructor.name);
         console.error('Error message:', error.message);
-        if (error.message.includes('429')) {
-          throw new Error('Rate limit exceeded. Please try again in a few minutes.');
-        } else if (error.message.includes('401') || error.message.includes('403')) {
-          throw new Error('Invalid OpenAI API key. Please check your configuration.');
-        } else if (error.message.includes('Failed to fetch')) {
-          throw new Error('Network error while contacting OpenAI API. Please check your internet connection.');
+        // Re-throw errors that are already meaningful
+        if (
+          error.message.includes('Rate limit') ||
+          error.message.includes('Invalid OpenAI API key') ||
+          error.message.includes('OpenAI API error') ||
+          error.message.includes('OpenAI server error') ||
+          error.message.includes('empty response')
+        ) {
+          throw error;
+        }
+        // Retry on network errors
+        if ((error.message.includes('fetch') || error.message.includes('network') || error.message.includes('ECONNRESET')) && retryCount < maxRetries - 1) {
+          const delay = Math.pow(2, retryCount) * 1500;
+          console.log(`Network error. Retrying in ${delay}ms... (attempt ${retryCount + 2}/${maxRetries})`);
+          await new Promise(res => setTimeout(res, delay));
+          return this.queryOpenAI(messages, retryCount + 1);
         }
       }
-      throw new Error('Failed to process OpenAI API request');
+      throw new Error('Failed to reach OpenAI API. Please check your internet connection and try again.');
     }
   }
 
@@ -623,15 +693,23 @@ export class RealCostCalculator {
     };
   }
 
-  private async queryWatsonx(prompt: string): Promise<string> {
+  private async queryWatsonx(prompt: string, retryCount = 0): Promise<string> {
     if (!this.watsonxApiKey) {
       throw new Error('IBM Watsonx API key is not configured');
     }
 
-    console.log('\n=== IBM WATSONX API: Request Details ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('Prompt length:', prompt.length, 'characters');
-    console.log('Prompt preview:', prompt.substring(0, 500) + '...');
+    const maxRetries = 3;
+    const separator = '-'.repeat(80);
+    console.log(`\n${separator}`);
+    console.log('  IBM WATSONX  |  PROMPT SENT');
+    console.log(`${separator}`);
+    console.log(`  Timestamp  : ${new Date().toISOString()}`);
+    console.log(`  Attempt    : ${retryCount + 1} / ${maxRetries}`);
+    console.log(`  Model      : ${this.watsonxModelId}`);
+    console.log(`  Prompt len : ${prompt.length} characters`);
+    console.log('\n  Full prompt:\n');
+    console.log(prompt);
+    console.log(`${separator}`);
 
     // Helper function to get IBM IAM Bearer token
     async function getWatsonxToken(apiKey: string): Promise<string> {
@@ -661,6 +739,8 @@ export class RealCostCalculator {
       // Use chat API instead of legacy text generation API for better compatibility
       const watsonxEndpoint = `${this.watsonxUrl}/ml/v1/text/chat?version=2024-11-19`;
       
+      // Watsonx /ml/v1/text/chat follows the OpenAI chat format:
+      // max_tokens / temperature / top_p must be TOP-LEVEL keys, not nested in "parameters"
       const requestBody: any = {
         model_id: this.watsonxModelId,
         messages: [
@@ -669,11 +749,9 @@ export class RealCostCalculator {
             content: prompt
           }
         ],
-        parameters: {
-          max_new_tokens: 2048,
-          temperature: 0.2,
-          top_p: 0.9
-        }
+        max_tokens: 8192,
+        temperature: 0.2,
+        top_p: 0.9
       };
       
       // Use space_id if available (preferred), otherwise use project_id
@@ -683,7 +761,11 @@ export class RealCostCalculator {
         requestBody.project_id = this.watsonxProjectId;
       }
       
-      console.log('\n=== Making IBM Watsonx API Request ===');
+      console.log('\n  Sending request to IBM Watsonx...');
+      console.log(`   Endpoint  : ${watsonxEndpoint}`);
+      console.log(`   Model     : ${requestBody.model_id}`);
+      console.log(`   Space ID  : ${requestBody.space_id || '(none)'}`);
+      console.log(`   Project ID: ${requestBody.project_id || '(none)'}`);
       const startTime = Date.now();
       
       const response = await fetch(watsonxEndpoint, {
@@ -696,85 +778,179 @@ export class RealCostCalculator {
       });
 
       const endTime = Date.now();
-      console.log('\n=== IBM Watsonx API Response ===');
-      console.log('Response time:', endTime - startTime, 'ms');
-      console.log('Response status:', response.status);
+      console.log(`  Watsonx responded in ${endTime - startTime}ms  |  HTTP ${response.status}`);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('IBM Watsonx API error response:', errorText);
+        console.error(`  Watsonx error response: ${errorText}`);
+        if (response.status === 429) {
+          if (retryCount < maxRetries - 1) {
+            const delay = Math.pow(2, retryCount) * 2000;
+            console.log(`Watsonx rate limited. Retrying in ${delay}ms... (attempt ${retryCount + 2}/${maxRetries})`);
+            await new Promise(res => setTimeout(res, delay));
+            return this.queryWatsonx(prompt, retryCount + 1);
+          }
+          throw new Error('IBM Watsonx rate limit exceeded after multiple retries. Please try again later.');
+        }
+        if (response.status >= 500) {
+          if (retryCount < maxRetries - 1) {
+            const delay = Math.pow(2, retryCount) * 1500;
+            console.log(`Watsonx server error (${response.status}). Retrying in ${delay}ms... (attempt ${retryCount + 2}/${maxRetries})`);
+            await new Promise(res => setTimeout(res, delay));
+            return this.queryWatsonx(prompt, retryCount + 1);
+          }
+        }
         throw new Error(`IBM Watsonx API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json() as any;
       
-      console.log('\n=== IBM Watsonx Response Data Structure ===');
-      console.log('Response keys:', Object.keys(data));
-      
       if (data.errors && data.errors.length > 0) {
         const errorMessage = data.errors[0].message || JSON.stringify(data.errors);
-        console.error('IBM Watsonx returned errors:', JSON.stringify(data.errors, null, 2));
+        console.error('  IBM Watsonx returned errors:', JSON.stringify(data.errors, null, 2));
         throw new Error(`IBM Watsonx AI error: ${errorMessage}`);
       }
 
       // Handle chat API format (preferred) and legacy text generation format
       let responseText: string | null = null;
+      let formatUsed = 'unknown';
       
       // Chat API format: data.choices[0].message.content (top-level choices)
       if (data.choices && data.choices[0] && data.choices[0].message) {
         responseText = data.choices[0].message.content || null;
-        console.log('Using chat API format (top-level choices)');
+        formatUsed = 'chat/choices (top-level)';
       }
       // Chat API format: data.results[0].choices[0].message.content (nested in results)
       else if (data.results && data.results[0] && data.results[0].choices && data.results[0].choices[0]) {
         responseText = data.results[0].choices[0].message?.content || null;
-        console.log('Using chat API format (nested in results)');
+        formatUsed = 'chat/choices (nested in results)';
       }
       // Legacy text generation format: data.results[0].generated_text
       else if (data.results && data.results[0]) {
         responseText = data.results[0].generated_text || data.results[0].text || null;
-        console.log('Using legacy text generation format');
-      }
-      
-      // Log response structure details
-      if (data.choices && data.choices[0]) {
-        console.log('Chat API - choices[0] keys:', Object.keys(data.choices[0]));
-        if (responseText) {
-          console.log('Generated text preview:', String(responseText).substring(0, 200));
-        }
-      } else if (data.results && data.results[0]) {
-        console.log('First result keys:', Object.keys(data.results[0]));
-        if (responseText) {
-          console.log('Generated text preview:', String(responseText).substring(0, 200));
-        }
+        formatUsed = 'legacy text generation';
       }
       
       // Handle empty response - Watsonx model may return empty string
       if (!responseText || typeof responseText !== 'string' || responseText.trim().length === 0) {
-        console.log('=== COST CALCULATOR: Watsonx returned empty response ===');
-        console.log('Response structure:', JSON.stringify({
-          hasResults: !!data.results,
-          resultsLength: data.results?.length,
-          firstResult: data.results?.[0],
-          stopReason: data.results?.[0]?.stop_reason,
-          allKeys: Object.keys(data)
-        }, null, 2));
+        console.warn(`  Watsonx returned EMPTY response  |  format tried: ${formatUsed}`);
+        console.warn('   Raw data keys:', Object.keys(data));
         // Return empty string to trigger fallback in calculateRealCost
         return '';
       }
 
       responseText = responseText.trim();
-      console.log('\n=== IBM Watsonx Response Text Preview ===');
-      console.log(responseText.substring(0, 500) + '...');
+
+      const sep2 = '-'.repeat(80);
+      console.log(`\n${sep2}`);
+      console.log('  IBM WATSONX  |  RESPONSE RECEIVED');
+      console.log(`${sep2}`);
+      console.log(`   Response time : ${endTime - startTime}ms`);
+      console.log(`  Format used   : ${formatUsed}`);
+      console.log(`  Length        : ${responseText.length} characters`);
+      console.log('\n  Full response:\n');
+      console.log(responseText);
+      console.log(`${sep2}`);
 
       return responseText;
     } catch (error: unknown) {
       console.error('\n=== IBM WATSONX API: Request Failed ===');
       if (error instanceof Error) {
-        console.error('Error type:', error.constructor.name);
         console.error('Error message:', error.message);
+        if (
+          error.message.includes('Watsonx rate limit') ||
+          error.message.includes('IBM Watsonx API error') ||
+          error.message.includes('IBM IAM token error')
+        ) {
+          throw error;
+        }
+        if ((error.message.includes('fetch') || error.message.includes('network') || error.message.includes('ECONNRESET')) && retryCount < maxRetries - 1) {
+          const delay = Math.pow(2, retryCount) * 1500;
+          console.log(`Watsonx network error. Retrying in ${delay}ms... (attempt ${retryCount + 2}/${maxRetries})`);
+          await new Promise(res => setTimeout(res, delay));
+          return this.queryWatsonx(prompt, retryCount + 1);
+        }
       }
-      throw new Error('Failed to process IBM Watsonx API request');
+      throw new Error('Failed to reach IBM Watsonx API. Please check your connection and try again.');
+    }
+  }
+
+  private async queryGemini(prompt: string): Promise<string> {
+    if (!this.geminiApiKey) {
+      throw new Error('Gemini API key is not configured (GEMINI_KEY)');
+    }
+
+    const separator = '-'.repeat(80);
+    console.log(`\n${separator}`);
+    console.log('  GOOGLE GEMINI 1.5 Flash  |  PROMPT SENT');
+    console.log(`${separator}`);
+    console.log(`  Timestamp : ${new Date().toISOString()}`);
+    console.log(`  Prompt len: ${prompt.length} characters`);
+    console.log('\n  Full prompt (first 2000 chars):\n');
+    console.log(prompt.substring(0, 2000) + (prompt.length > 2000 ? '\n  ...(truncated)' : ''));
+    console.log(`${separator}`);
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`;
+    const startTime = Date.now();
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 8192
+          }
+        })
+      });
+
+      const endTime = Date.now();
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`  Gemini error HTTP ${response.status}: ${errorText.substring(0, 300)}`);
+        if (response.status === 429) {
+          throw new Error(`Gemini rate limit exceeded: ${response.status}`);
+        }
+        if (response.status === 400) {
+          throw new Error(`Gemini invalid request (400): ${errorText.substring(0, 200)}`);
+        }
+        throw new Error(`Gemini API error ${response.status}: ${errorText.substring(0, 200)}`);
+      }
+
+      const data = await response.json() as any;
+      const responseText: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (!responseText) {
+        console.error('  Gemini returned empty response. Raw data:', JSON.stringify(data).substring(0, 300));
+        throw new Error('Gemini returned an empty response');
+      }
+
+      const sep2 = '-'.repeat(80);
+      console.log(`\n${sep2}`);
+      console.log('  GOOGLE GEMINI 1.5 Flash  |  RESPONSE RECEIVED');
+      console.log(`${sep2}`);
+      console.log(`   Response time : ${endTime - startTime}ms`);
+      console.log(`  Length        : ${responseText.length} characters`);
+      console.log('\n  Full response:\n');
+      console.log(responseText);
+      console.log(`${sep2}`);
+
+      return responseText;
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      if (
+        err.message.includes('Gemini rate limit') ||
+        err.message.includes('Gemini invalid request') ||
+        err.message.includes('Gemini API error') ||
+        err.message.includes('Gemini returned an empty')
+      ) {
+        throw err;
+      }
+      console.error(`  Gemini network/fetch error: ${err.message}`);
+      throw new Error(`Failed to reach Gemini API: ${err.message}`);
     }
   }
 
@@ -816,16 +992,21 @@ export class RealCostCalculator {
 
   private buildCalculationPrompt(role: string, project: any): string {
     const projectData = JSON.stringify(project);
+    const today = new Date().toISOString().split('T')[0];
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
     
     switch (role) {
       case "inspector":
-        return `You are a professional roofing cost estimation expert. Calculate ONLY the cost values for an inspector report based on this project data: ${projectData}
+        return `You are a professional roofing cost estimation expert. Today's date is ${today} (${currentMonth} ${currentYear}). Use current ${currentYear} market pricing for all materials and labor in the project's location.
+
+Calculate ONLY the cost values for an inspector report based on this project data: ${projectData}
 
 Calculate these cost values and return ONLY a JSON object with these fields:
 {
-  "materialsCost": [Calculate materials cost for ${project.area || 1000} sq ft with ${project.materialTier || 'standard'} tier materials],
-  "laborCost": [Calculate labor for ${project.roofPitch || 'standard'} roof with complexity factors],
-  "permitsCost": [Calculate permits for ${project.projectType || 'residential'} in ${project.location?.city || project.location || 'standard location'}],
+  "materialsCost": [Calculate materials cost for ${project.area || 1000} sq ft with ${project.materialTier || 'standard'} tier materials at current ${currentYear} market prices],
+  "laborCost": [Calculate labor for ${project.roofPitch || 'standard'} roof at current ${currentYear} labor rates in ${project.location?.city || project.location || 'the project location'}],
+  "permitsCost": [Calculate permits for ${project.projectType || 'residential'} in ${project.location?.city || project.location || 'standard location'} at current ${currentYear} permit fees],
   "contingencyCost": [Calculate 7% contingency on total of materials + labor + permits],
   "imageAnalysis": [For each uploaded image, return a string annotation. Array length MUST match number of images.]
 }
@@ -833,13 +1014,15 @@ Calculate these cost values and return ONLY a JSON object with these fields:
 Return ONLY valid JSON with numeric values. No markdown, no explanations.`;
 
       case "insurance-adjuster":
-        return `You are a professional roofing cost estimation expert. Calculate ONLY the cost values for an insurance claim report based on this project data: ${projectData}
+        return `You are a professional roofing cost estimation expert. Today's date is ${today} (${currentMonth} ${currentYear}). Use current ${currentYear} market pricing for all materials and labor in the project's location.
+
+Calculate ONLY the cost values for an insurance claim report based on this project data: ${projectData}
 
 Calculate these cost values and return ONLY a JSON object with these fields:
 {
-  "materialsCost": [Calculate materials cost for ${project.area || 1000} sq ft],
-  "laborCost": [Calculate labor costs],
-  "permitsCost": [Calculate permits if needed],
+  "materialsCost": [Calculate materials cost for ${project.area || 1000} sq ft at current ${currentYear} market prices],
+  "laborCost": [Calculate labor costs at current ${currentYear} rates in ${project.location?.city || project.location || 'the project location'}],
+  "permitsCost": [Calculate permits if needed at current ${currentYear} fees],
   "contingencyCost": [Calculate 7% contingency],
   "imageAnalysis": [For each uploaded image, return a string annotation describing damage. Array length MUST match number of images.]
 }
@@ -861,7 +1044,9 @@ Return ONLY valid JSON with numeric values. No markdown, no explanations.`;
         const lineItems = project.lineItems || [];
         const hasDebrisRemoval = lineItems.some((item: string) => item.toLowerCase().includes('debris'));
         
-        return `You are a professional roofing cost estimation expert. Calculate ONLY the cost values for a contractor report based on this project data: ${projectData}
+        return `You are a professional roofing cost estimation expert. Today's date is ${today} (${currentMonth} ${currentYear}). Use current ${currentYear} material pricing and labor rates for ${city || 'the project location'}.
+
+Calculate ONLY the cost values for a contractor report based on this project data: ${projectData}
 
 CRITICAL COST CALCULATION RULES - FOLLOW THESE EXACTLY:
 
@@ -905,17 +1090,17 @@ CRITICAL COST CALCULATION RULES - FOLLOW THESE EXACTLY:
    - NYC/High-cost areas: $100-120/hour
    - Rush job/10+ workers: $80-100/hour (higher rate, fewer hours)
    
-   LABOR COST = totalHours × ratePerHour
+   LABOR COST = totalHours  ratePerHour
    
    EXPECTED LABOR COST RANGES BY SCENARIO:
-   - BASELINE: $2000-$3000 (use 50 hours × $50 = $2500)
-   - LUXURY MATERIAL: $4000-$6000 (use 60-80 hours × $60-75)
-   - OLD ROOF: $2300-$3400 (use 45-55 hours × $50-60)
-   - PARTIAL REPAIR: $800-$1500 (use 12-15 hours × $60-80)
+   - BASELINE: $2000-$3000 (use 50 hours  $50 = $2500)
+   - LUXURY MATERIAL: $4000-$6000 (use 60-80 hours  $60-75)
+   - OLD ROOF: $2300-$3400 (use 45-55 hours  $50-60)
+   - PARTIAL REPAIR: $800-$1500 (use 12-15 hours  $60-80)
    - COMMERCIAL: $4000-$6000
-   - RUSH JOB (10+ workers): $6000-$8500 (use 40-50 hours × $120-150)
-   - NYC: $7000-$10000 (use 60-80 hours × $100-120)
-   - MULTI-LEVEL: $7000-$10500 (use 80-100 hours × $80-100)
+   - RUSH JOB (10+ workers): $6000-$8500 (use 40-50 hours  $120-150)
+   - NYC: $7000-$10000 (use 60-80 hours  $100-120)
+   - MULTI-LEVEL: $7000-$10500 (use 80-100 hours  $80-100)
    
    TARGET: Labor cost should be within the expected range for each scenario above
 
@@ -933,7 +1118,7 @@ CRITICAL COST CALCULATION RULES - FOLLOW THESE EXACTLY:
    - NYC: $400-600
 
 7. GEOGRAPHIC MULTIPLIERS:
-   - NYC/New York City: Labor × 2.0, Materials × 1.2-1.3
+   - NYC/New York City: Labor  2.0, Materials  1.2-1.3
    - Standard areas: No multiplier
 
 8. STRUCTURE TYPE ADJUSTMENTS:
@@ -949,18 +1134,18 @@ CRITICAL COST CALCULATION RULES - FOLLOW THESE EXACTLY:
 11. TOTAL COST = materialsCost + laborCost + permitsCost + equipmentCost + contingencyCost
 
 SPECIFIC SCENARIO RULES - FOLLOW EXACTLY:
-${jobType === 'Full Replace' && materialLayers.length === 1 && !isNYC && !structureType.includes('Commercial') && !workerCount.includes('10+') && roofAge < 30 && lineItems.length <= 5 ? '- BASELINE (1200 sq ft, Standard, Full Replace, 1-2 workers): Materials $4500-$5000 (shingles + underlayment + debris), Labor $2000-$3000 (50 hours × $50 = $2500), Equipment $500-$800, Permits $300, Contingency 7%, Total $6800-$9800' : ''}
-${jobType === 'Partial Repair' ? '- PARTIAL REPAIR: Materials $800-$1200, Labor $800-$1500 (12-15 hours × $60-80), Equipment $200-300, Permits $100-200, Total $1900-$3600' : ''}
-${materialType === 'Slate' ? '- LUXURY MATERIAL (Slate): Materials $18000-$25000, Labor $4000-$6000 (60-80 hours × $60-75), Equipment $800-1200, Permits $400-600, Total $25000-$34000' : ''}
+${jobType === 'Full Replace' && materialLayers.length === 1 && !isNYC && !structureType.includes('Commercial') && !workerCount.includes('10+') && roofAge < 30 && lineItems.length <= 5 ? '- BASELINE (1200 sq ft, Standard, Full Replace, 1-2 workers): Materials $4500-$5000 (shingles + underlayment + debris), Labor $2000-$3000 (50 hours  $50 = $2500), Equipment $500-$800, Permits $300, Contingency 7%, Total $6800-$9800' : ''}
+${jobType === 'Partial Repair' ? '- PARTIAL REPAIR: Materials $800-$1200, Labor $800-$1500 (12-15 hours  $60-80), Equipment $200-300, Permits $100-200, Total $1900-$3600' : ''}
+${materialType === 'Slate' ? '- LUXURY MATERIAL (Slate): Materials $18000-$25000, Labor $4000-$6000 (60-80 hours  $60-75), Equipment $800-1200, Permits $400-600, Total $25000-$34000' : ''}
 ${materialLayers.length > 1 ? '- MULTIPLE LAYERS: Materials $6000-$8000 (with 25-30% removal premium), Labor $4500-$6000, Equipment $1000-1500, Permits $300-400, Contingency 7%, Total $13400-$19100' : ''}
-${roofAge >= 30 && roofAge < 100 ? '- OLD ROOF (30+ years): Materials $4500-$5500, Labor $2300-$3400 (45-55 hours × $50-60), Equipment $500-700, Permits $300, Total $7200-$10800' : ''}
-${structureType.includes('Commercial') || structureType.includes('Warehouse') ? '- COMMERCIAL: Materials $7200-$12000 (BUR), Labor $4000-$6000 (60-80 hours × $60-75), Equipment $1000-1500, Permits $400-600, Total $13200-$19300' : ''}
+${roofAge >= 30 && roofAge < 100 ? '- OLD ROOF (30+ years): Materials $4500-$5500, Labor $2300-$3400 (45-55 hours  $50-60), Equipment $500-700, Permits $300, Total $7200-$10800' : ''}
+${structureType.includes('Commercial') || structureType.includes('Warehouse') ? '- COMMERCIAL: Materials $7200-$12000 (BUR), Labor $4000-$6000 (60-80 hours  $60-75), Equipment $1000-1500, Permits $400-600, Total $13200-$19300' : ''}
 ${lineItems.length >= 8 ? '- MANY LINE ITEMS: Materials $6000-$10000, Labor $4800-$6000, Equipment $1500-2500, Permits $300-500, Total $13400-$22750' : ''}
-${isNYC ? '- NYC LOCATION: Materials $5000-$6000 (1.2x multiplier), Labor $7000-$10000 (60-80 hours × $100-120), Equipment $800-1200, Permits $400-600, Total $15800-$22500' : ''}
-${structureType.includes('Multi-Family') || structureType.includes('3-Story') ? '- MULTI-LEVEL: Materials $4500-$5000, Labor $7000-$10500 (80-100 hours × $80-100), Equipment $1000-1500, Permits $300-500, Total $14500-$22500' : ''}
-${workerCount.includes('10+') ? '- RUSH JOB (10+ workers): Materials $4500-$5000, Labor $6000-$8500 (40-50 hours × $120-150), Equipment $600-800, Permits $300, Total $10800-$15300' : ''}
-${roofAge >= 100 ? '- HISTORICAL (100+ years): Materials $10000-$15000 (Wood Shakes), Labor $8000-$12000 (100-120 hours × $80-100), Equipment $1000-1500, Permits $300-500, Total $19800-$29700' : ''}
-${materialType === 'Metal Roofing' ? '- METAL ROOFING: Materials $12000-$18000, Labor $8000-$12000 (100-120 hours × $80-100), Equipment $900-1200, Permits $300-500, Total $23100-$34900' : ''}
+${isNYC ? '- NYC LOCATION: Materials $5000-$6000 (1.2x multiplier), Labor $7000-$10000 (60-80 hours  $100-120), Equipment $800-1200, Permits $400-600, Total $15800-$22500' : ''}
+${structureType.includes('Multi-Family') || structureType.includes('3-Story') ? '- MULTI-LEVEL: Materials $4500-$5000, Labor $7000-$10500 (80-100 hours  $80-100), Equipment $1000-1500, Permits $300-500, Total $14500-$22500' : ''}
+${workerCount.includes('10+') ? '- RUSH JOB (10+ workers): Materials $4500-$5000, Labor $6000-$8500 (40-50 hours  $120-150), Equipment $600-800, Permits $300, Total $10800-$15300' : ''}
+${roofAge >= 100 ? '- HISTORICAL (100+ years): Materials $10000-$15000 (Wood Shakes), Labor $8000-$12000 (100-120 hours  $80-100), Equipment $1000-1500, Permits $300-500, Total $19800-$29700' : ''}
+${materialType === 'Metal Roofing' ? '- METAL ROOFING: Materials $12000-$18000, Labor $8000-$12000 (100-120 hours  $80-100), Equipment $900-1200, Permits $300-500, Total $23100-$34900' : ''}
 ${lineItems.some((item: string) => item.toLowerCase().includes('hurricane') || item.toLowerCase().includes('high-wind')) ? '- EXTREME WEATHER: Materials $5500-$6000 (premium shingles), Labor $2200-$3200, Equipment $600-800, Permits $300, Total $8000-$11500' : ''}
 
 Return ONLY a JSON object with:
@@ -992,13 +1177,15 @@ CRITICAL: All values MUST fall within the expected ranges for this specific scen
 Return ONLY valid JSON. No markdown, no explanations.`;
 
       case "homeowner":
-        return `You are a professional roofing cost estimation expert. Calculate ONLY the cost values for a homeowner report based on this project data: ${projectData}
+        return `You are a professional roofing cost estimation expert. Today's date is ${today} (${currentMonth} ${currentYear}). Use current ${currentYear} market pricing for materials and labor in ${project.location?.city || 'the project location'}.
+
+Calculate ONLY the cost values for a homeowner report based on this project data: ${projectData}
 
 Calculate these cost values and return ONLY a JSON object:
 {
-  "materialsCost": [Calculate materials cost],
-  "laborCost": [Calculate labor costs],
-  "permitsCost": [Calculate permits],
+  "materialsCost": [Calculate materials cost at current ${currentYear} market prices],
+  "laborCost": [Calculate labor costs at current ${currentYear} rates in ${project.location?.city || 'the project location'}],
+  "permitsCost": [Calculate permits at current ${currentYear} fees],
   "contingencyCost": [Calculate 7% contingency],
   "imageAnalysis": [For each uploaded image, return a friendly description. Array length MUST match number of images.]
 }
@@ -1006,31 +1193,48 @@ Calculate these cost values and return ONLY a JSON object:
 Return ONLY valid JSON with numeric values. No markdown, no explanations.`;
 
       default:
-        return `Calculate cost values for project: ${projectData}. Return JSON with materialsCost, laborCost, permitsCost, contingencyCost.`;
+        return `Today's date is ${today}. Calculate cost values for project: ${projectData}. Return JSON with materialsCost, laborCost, permitsCost, contingencyCost.`;
     }
   }
 
   private buildReportPrompt(role: string, project: any): string {
     const projectData = JSON.stringify(project);
+    const today = new Date().toISOString().split('T')[0];
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
     
     switch (role) {
       case "inspector":
-        return `You are a professional roof inspector. Generate a comprehensive Inspector Report in JSON format based on this project data: ${projectData}
+        return `You are a senior professional roof inspector with 15+ years of experience. Today's date is ${today} (${currentMonth} ${currentYear}). Generate a detailed, comprehensive Inspector Report in JSON format based on this project data: ${projectData}
 
-IMPORTANT: Generate the ENTIRE report in ${project.preferredLanguage || 'English'} language and use ${project.preferredCurrency || 'USD'} currency.
+IMPORTANT: Generate the ENTIRE report in ${project.preferredLanguage || 'English'} language and use ${project.preferredCurrency || 'USD'} currency. Use current ${currentYear} cost benchmarks for the location.
 
-Return a JSON object with these fields:
+Return a JSON object with these fields  each narrative field must be 2-5 sentences of professional detail, not a placeholder:
 {
-  "inspectorNameContact": "${project.inspectorInfo?.name || 'Inspector name not provided'} - License: ${project.inspectorInfo?.license || 'License not provided'}",
+  "inspectorNameContact": "${project.inspectorInfo?.name || 'Inspector name not provided'} - License: ${project.inspectorInfo?.license || 'License not provided'} - Contact: ${project.inspectorInfo?.contact || 'Not provided'}",
   "inspectionDateTime": "${project.inspectionDate || 'Inspection date not provided'}",
+  "reportGeneratedDate": "${today}",
   "addressGpsCoordinates": "${project.location?.city || project.location}, ${project.location?.country || ''} ${project.location?.zipCode || ''}",
-  "structureOverview": "Professional description of ${project.structureType} structure with ${project.roofPitch} roof pitch",
-  "slopeConditionTable": ["Analyze each slope from damage data"],
-  "roofingComponents": "Detailed component analysis",
-  "inspectorNotesEquipment": "Professional notes on weather conditions and equipment",
-  "annotatedPhotographicEvidence": ["Professional image annotations - one per image"],
-  "timeline": "Professional timeline estimate",
-  "contingencySuggestions": "Professional contingency recommendations"
+  "structureOverview": "Detailed professional description of the ${project.structureType || 'structure'} including age (${project.roofAge || 'unknown'} years), pitch characteristics (${project.roofPitch || 'unknown'}), material layers, and overall condition assessment based on observed data.",
+  "slopeConditionTable": ["For each slope in the damage data, provide: slope identifier, damage type, severity rating, measured area affected, recommended action, and estimated repair priority (1=urgent, 3=routine)"],
+  "roofingComponentsAssessment": {
+    "underlayment": "Condition and type of underlayment (${project.felt || 'unknown type'})  describe suitability and any observed issues",
+    "iceWaterShield": "Assessment of ice and water shield presence (${project.iceWaterShield ? 'Present' : 'Not observed'}) and effectiveness",
+    "dripEdge": "Drip edge condition (${project.dripEdge ? 'Present' : 'Not present'})  note code compliance and protection effectiveness",
+    "gutterApron": "Gutter apron status (${project.gutterApron ? 'Present' : 'Not present'}) and drainage impact",
+    "fascia": "Fascia board condition: ${project.fascia?.condition || 'not recorded'}  structural and aesthetic implications",
+    "gutters": "Gutter system condition: ${project.gutter?.condition || 'not recorded'}  drainage effectiveness and recommended maintenance"
+  },
+  "inspectorNotesEquipment": "Detailed field notes including weather conditions at time of inspection (${project.weatherConditions || 'not recorded'}), access equipment used (${Array.isArray(project.accessTools) ? project.accessTools.join(', ') : 'not specified'}), any access limitations encountered, and observations not captured in structured fields.",
+  "ownerNotes": "${project.ownerNotes || 'No owner notes provided.'}",
+  "annotatedPhotographicEvidence": ["For each uploaded image: provide a 2-3 sentence professional annotation identifying the component shown, observed condition, specific defects or damage noted, and relevance to the overall inspection findings"],
+  "repairRecommendations": {
+    "immediateActions": ["List urgent repairs needed within 0-30 days with brief justification"],
+    "shortTerm": ["List repairs needed within 30-90 days"],
+    "longTerm": ["List maintenance and replacement items for 1-5 year planning horizon"]
+  },
+  "timeline": "Detailed timeline estimate for recommended repairs, broken down by priority tier (immediate/short-term/long-term) with rationale based on current damage severity and seasonal considerations.",
+  "contingencySuggestions": "Professional contingency recommendations based on the specific conditions observed, including percentage range (typically 10-20% for roofing), justification for the recommended amount, and factors that could increase costs."
 }
 
 CRITICAL INSTRUCTIONS:
@@ -1044,11 +1248,13 @@ CRITICAL INSTRUCTIONS:
 Use ONLY actual form data from the project. Return ONLY valid JSON.`;
 
       case "insurance-adjuster":
-        return `You are an insurance adjuster. Generate a comprehensive Insurance Claim Report in JSON format based on this project data: ${projectData}
+        return `You are a senior insurance claims adjuster with expertise in roofing damage assessment. Today's date is ${today} (${currentMonth} ${currentYear}). Use current ${currentYear} replacement cost values for the project's location.
+
+Generate a detailed, comprehensive Insurance Claim Report in JSON format based on this project data: ${projectData}
 
 IMPORTANT: Generate the ENTIRE report in ${project.preferredLanguage || 'English'} language and use ${project.preferredCurrency || 'USD'} currency.
 
-Return a JSON object with these sections:
+Return a JSON object with these sections  all narrative fields must be substantive (2-4 sentences), not placeholders:
 {
   "claimMetadata": {
     "claimNumber": "${project.claimNumber || 'Not provided'}",
@@ -1056,7 +1262,8 @@ Return a JSON object with these sections:
     "adjusterName": "${project.adjusterName || 'Not provided'}",
     "adjusterContact": "${project.adjusterContact || 'Not provided'}",
     "dateOfLoss": "${project.dateOfLoss || 'Not provided'}",
-    "dateOfInspection": "${new Date().toISOString().split('T')[0]}"
+    "dateOfInspection": "${today}",
+    "reportDate": "${today}"
   },
   "inspectionSummary": {
     "propertyAddress": "${project.location?.city || project.location}, ${project.location?.country || ''} ${project.location?.zipCode || ''}",
@@ -1065,38 +1272,45 @@ Return a JSON object with these sections:
     "roofPitch": "${project.roofPitch}",
     "existingMaterials": "${project.materialLayers?.join(', ')}",
     "totalArea": "${project.area || 1000} sq ft",
-    "weatherConditions": "${project.weatherConditions || 'Not recorded'}"
+    "weatherConditions": "${project.weatherConditions || 'Not recorded'}",
+    "propertyConditionNarrative": "Provide 2-3 sentences describing the overall property and roof condition as observed during inspection, referencing the age, materials, and pitch."
   },
   "coverageTable": {
     "coveredItems": ${JSON.stringify(project.coverageMapping?.covered || [])},
     "nonCoveredItems": ${JSON.stringify(project.coverageMapping?.excluded || [])},
-    "maintenanceItems": ${JSON.stringify(project.coverageMapping?.maintenance || [])}
+    "maintenanceItems": ${JSON.stringify(project.coverageMapping?.maintenance || [])},
+    "coverageAnalysisNarrative": "Provide a 2-3 sentence explanation of why specific items are covered or excluded under standard policy terms, referencing the cause of loss."
   },
   "stormDamageAssessment": {
     "primaryDamageCause": "${project.damageCause || 'Under investigation'}",
-    "affectedComponents": ["${project.materialLayers?.join('", "')}"],
+    "damageCauseNarrative": "Provide a detailed 3-4 sentence description of how the identified cause (${project.damageCause || 'damage cause'}) created the observed damage pattern, including the mechanism of damage and what indicators confirm this cause.",
+    "affectedComponents": ${JSON.stringify(project.materialLayers || [])},
     "damageExtent": ${JSON.stringify(project.slopeDamage || [])},
+    "damageExtentNarrative": "Provide a 2-3 sentence summary of the overall damage scope, including percentage of roof surface affected and severity distribution.",
     "impactedSystems": {
       "roofingSystem": ${JSON.stringify({
-        "iceWaterShield": project.iceWaterShield ? "Damaged" : "N/A",
-        "felt": project.felt,
-        "dripEdge": project.dripEdge ? "Present" : "N/A",
-        "gutterSystem": project.gutter?.condition || "Not specified",
-        "fasciaCondition": project.fascia?.condition || "Not specified"
-      })}
+        "iceWaterShield": project.iceWaterShield ? "Present  assess for damage" : "Not observed",
+        "felt": project.felt || "Not specified",
+        "dripEdge": project.dripEdge ? "Present  assess for displacement" : "Not present",
+        "gutterSystem": project.gutter?.condition || "Not assessed",
+        "fasciaCondition": project.fascia?.condition || "Not assessed"
+      })},
+      "systemsNarrative": "Describe condition and storm-related impact to each roofing system component, noting which require replacement versus repair."
     }
   },
   "repairHistory": {
     "previousRepairs": "${project.previousRepairs || 'No prior repairs documented'}",
-    "maintenanceRecords": "Documentation ${project.previousRepairs ? 'provided' : 'not provided'}"
+    "maintenanceRecords": "Documentation ${project.previousRepairs ? 'provided  reviewed for relevance to current claim' : 'not provided'}",
+    "preExistingConditionAnalysis": "Identify any pre-existing wear or damage separate from the storm event, and explain how these were differentiated from covered storm damage."
   },
   "damageClassificationsTable": ${JSON.stringify(project.slopeDamage || [])},
-  "annotatedPhotos": ["Professional image annotations - one per image"],
+  "annotatedPhotos": ["For each uploaded photo: provide a 2-3 sentence professional annotation identifying the component, the specific damage type visible, severity classification, and how this damage relates to the claimed cause of loss"],
+  "replacementCostEstimateNarrative": "Provide a 3-4 sentence explanation of how replacement costs were determined, referencing current ${currentYear} material and labor prices in ${project.location?.city || 'the project location'}, applicable depreciation methodology, and any code upgrade requirements.",
   "legalCertificationNotes": {
     "propertyType": "${project.projectType}",
     "jurisdiction": "${project.location?.city || project.location}",
-    "buildingCodes": "Local building codes and compliance requirements",
-    "certificationStatement": "This report is prepared for insurance purposes by ${project.adjusterName || 'assigned adjuster'}"
+    "buildingCodes": "Identify applicable local building codes and any code-required upgrades triggered by this repair scope",
+    "certificationStatement": "This report was prepared by ${project.adjusterName || 'the assigned adjuster'} on ${today} and represents an independent assessment of the reported damage based on physical inspection and documented evidence."
   }
 }
 
@@ -1104,42 +1318,66 @@ CRITICAL INSTRUCTIONS:
 - Return ONLY a valid JSON object
 - Start your response with { and end with }
 - Do NOT include any text before or after the JSON
-- Do NOT include safety definitions, risk assessments, or explanatory text
+- Do NOT include safety definitions, risk assessments, or explanatory text outside the JSON
 - Do NOT use markdown code blocks
 - The JSON must be parseable and complete
 
 Use ONLY actual form data from the project. Return ONLY valid JSON.`;
 
       case "contractor":
-        return `You are a professional roofing contractor. Generate a comprehensive contractor report in JSON format based on this project data: ${projectData}
+        return `You are an experienced roofing contractor with deep knowledge of ${currentYear} material costs, labor markets, and best practices. Today's date is ${today} (${currentMonth} ${currentYear}).
 
-IMPORTANT: Generate the ENTIRE report in ${project.preferredLanguage || 'English'} language and use ${project.preferredCurrency || 'USD'} currency.
+Generate a comprehensive, detailed contractor work report in JSON format based on this project data: ${projectData}
 
-Return a JSON object with these sections:
+IMPORTANT: Generate the ENTIRE report in ${project.preferredLanguage || 'English'} language and use ${project.preferredCurrency || 'USD'} currency. Use current ${currentYear} pricing for ${project.location?.city || 'the project location'}.
+
+Return a JSON object with these sections  all narrative fields must be substantive and specific to the project, not generic placeholders:
 {
   "projectDetails": {
     "address": "${project.location?.city || ''}, ${project.location?.country || ''} ${project.location?.zipCode || ''}",
     "type": "${project.projectType || 'Not specified'}",
+    "jobType": "${project.jobType || 'Not specified'}",
     "dimensions": {
       "totalArea": ${project.area || 1200},
       "pitch": "${project.roofPitch || 'Not specified'}",
       "slopes": ${Array.isArray(project.slopeDamage) ? project.slopeDamage.length : 1}
-    }
+    },
+    "projectNarrative": "Provide a 2-3 sentence project overview describing the scope, the structure, and the primary objective of the work based on the submitted data."
   },
   "scopeOfWork": {
-    "preparationTasks": ["Site assessment", "Material delivery", "Permits", "Weather monitoring"],
-    "removalTasks": ["Removal tasks based on job type"],
-    "installationTasks": ["Installation tasks"],
-    "finishingTasks": ["Site cleanup", "Final walkthrough", "Warranty documentation"]
+    "preparationTasks": ["List all specific preparation tasks required for this project based on job type (${project.jobType}), structure type (${project.structureType}), and location"],
+    "removalTasks": ["List all specific removal tasks, referencing the existing materials (${project.materialLayers?.join(', ')}) and number of layers"],
+    "installationTasks": ["List all specific installation tasks for the selected materials and components, including underlayment (${project.felt}), ice/water shield (${project.iceWaterShield ? 'yes' : 'no'}), drip edge, and primary roofing material"],
+    "inspectionCheckpoints": ["List quality control checkpoints throughout the project"],
+    "finishingTasks": ["List all finishing, cleanup, and documentation tasks"]
   },
   "laborRequirements": {
     "crewSize": "${project.laborNeeds?.workerCount || '3-5'} workers",
     "estimatedDays": "${project.jobType === 'full-replace' ? '5-8' : '2-4'}",
-    "specialEquipment": ["Equipment list"],
-    "safetyRequirements": ["OSHA compliant fall protection", "Safety equipment"]
+    "specialEquipment": ["List specific equipment required based on roof pitch (${project.roofPitch}), structure type, and line items"],
+    "safetyRequirements": ["List OSHA-compliant safety requirements specific to this job's pitch, height, and structure type"],
+    "laborNarrative": "Explain the crew composition rationale, daily work sequence, and how the ${project.laborNeeds?.workerCount || '3-5'} worker count was determined for this project size and complexity."
   },
   "materialBreakdown": {
-    "lineItems": [{"item": "Materials", "quantity": 1, "unit": "project", "notes": "Based on specifications"}]
+    "lineItems": [{"item": "Each requested line item from ${JSON.stringify(project.lineItems || [])}", "quantity": "calculated quantity based on ${project.area || 1200} sq ft", "unit": "appropriate unit (sq, LF, EA, etc.)", "notes": "Installation specification or code requirement note"}],
+    "materialSpecifications": "Provide 2-3 sentences detailing the specific product grades, manufacturer specifications, and code-compliance requirements for the primary materials on this project.",
+    "wasteFactorNote": "Explain the waste factor applied (typically 10-15% for standard roofs, higher for complex cuts) and how it affects the material quantities ordered."
+  },
+  "permitAndCode": {
+    "permitRequired": ${project.localPermit ? 'true' : 'false'},
+    "localCodeRequirements": "Describe applicable building code requirements in ${project.location?.city || 'the project location'} for a ${project.projectType} roof replacement/repair project.",
+    "inspectionMilestones": ["List required inspection points during the work"]
+  },
+  "projectTimeline": {
+    "estimatedStartPrep": "Weather and permit dependent  typically 3-7 days from contract execution",
+    "estimatedCompletionDays": "${project.jobType === 'full-replace' ? '5-8' : '2-4'} working days",
+    "weatherConsiderations": "Describe seasonal weather risks in ${project.location?.city || 'the project location'} for ${currentMonth} ${currentYear} and mitigation strategies.",
+    "milestones": ["Day 1: Setup and material delivery", "Day 2-3: Tear-off and deck inspection", "Day 4-5: Installation", "Final: Inspection and cleanup"]
+  },
+  "warrantyAndQuality": {
+    "materialWarranty": "Describe manufacturer warranty terms for the selected materials",
+    "workmanshipWarranty": "Standard contractor workmanship warranty terms",
+    "qualityAssuranceProcess": "Describe the QA process for this project"
   }
 }
 
@@ -1147,69 +1385,86 @@ CRITICAL INSTRUCTIONS:
 - Return ONLY a valid JSON object
 - Start your response with { and end with }
 - Do NOT include any text before or after the JSON
-- Do NOT include safety definitions, risk assessments, or explanatory text
+- Do NOT include safety definitions, risk assessments, or explanatory text outside the JSON
 - Do NOT use markdown code blocks
 - The JSON must be parseable and complete
 
 Use ONLY actual form data from the project. Return ONLY valid JSON.`;
 
       case "homeowner":
-        return `You are a friendly roofing expert. Generate a homeowner-friendly report in JSON format based on this project data: ${projectData}
+        return `You are a friendly, knowledgeable roofing expert helping a homeowner understand their roof's condition and costs. Today's date is ${today} (${currentMonth} ${currentYear}). Use current ${currentYear} market prices for ${project.location?.city || 'the project location'}.
 
-IMPORTANT: Generate the ENTIRE report in ${project.preferredLanguage || 'English'} language and use ${project.preferredCurrency || 'USD'} currency.
+Generate a clear, detailed homeowner-friendly report in JSON format based on this project data: ${projectData}
 
-Return a JSON object with these sections:
+IMPORTANT: Generate the ENTIRE report in ${project.preferredLanguage || 'English'} language and use ${project.preferredCurrency || 'USD'} currency. Explain all technical terms in plain language.
+
+Return a JSON object with these sections  all narrative fields must be written clearly for a homeowner, not a professional contractor, with specific detail:
 {
   "welcomeMessage": {
     "greeting": "Dear ${project.homeownerInfo?.name || 'Homeowner'},",
-    "introduction": "Thank you for choosing FlacronBuild for your roofing assessment.",
-    "ourCommitment": "Our goal is to provide clear, honest information about your roof's condition."
+    "introduction": "Write a warm, professional 2-sentence introduction explaining what this report covers and how to use it.",
+    "reportDate": "${today}",
+    "ourCommitment": "Write a 1-2 sentence commitment statement about providing honest, transparent roofing information."
   },
   "roofOverview": {
     "propertyType": "${project.structureType || 'Residential structure'}",
     "roofAge": "${project.roofAge ? project.roofAge + ' years old' : 'Age not specified'}",
     "roofStyle": "${project.roofPitch || 'Standard pitch'}",
     "currentMaterials": "${project.materialLayers?.join(', ') || 'Standard roofing materials'}",
-    "overallCondition": "Professional assessment",
-    "keyFeatures": ["Feature list"]
+    "overallCondition": "Write 2-3 sentences giving an honest overall condition assessment based on the age (${project.roofAge} years), material type, and any damage data provided. Use plain language a homeowner can understand.",
+    "whatTheAgeOfYourRoofMeans": "Explain in 2-3 simple sentences what a ${project.roofAge}-year-old ${project.materialLayers?.[0] || 'roof'} typically means in terms of remaining lifespan and what to expect.",
+    "keyFeatures": ["List key features or components of this roof that are relevant to its condition and maintenance"]
   },
   "damageSummary": {
-    "inspectionFindings": "Findings description",
-    "priorityLevel": "Priority assessment",
-    "mainConcerns": ["Concern list"],
-    "whatThisMeans": "Explanation in simple terms"
+    "inspectionFindings": "Write 3-4 sentences summarizing all damage findings from the submitted data in plain language. Explain what was found and where.",
+    "priorityLevel": "Explain the overall urgency level in simple terms  is this something that needs immediate attention, or can it wait? Why?",
+    "mainConcerns": ["List each specific concern in plain language with a 1-sentence plain English explanation of why it matters"],
+    "whatThisMeans": "Write 2-3 sentences explaining what the overall damage assessment means for the homeowner  impact on home value, insurance, energy efficiency, or structural integrity."
   },
   "repairSuggestions": {
-    "immediateActions": ["Action items"],
-    "shortTermPlanning": ["Planning items"],
+    "immediateActions": ["List specific actions needed within 30 days with a plain-language explanation of why each is urgent"],
+    "shortTermPlanning": ["List items to address within 3-6 months with brief explanation"],
     "longTermOutlook": {
-      "timeline": "Timeline estimate",
-      "investmentGuidance": "Investment advice",
-      "preventiveCare": "Preventive care tips"
+      "timeline": "Write 2-3 sentences giving a realistic timeline for when this roof will need significant work or replacement, based on current age and condition.",
+      "investmentGuidance": "Write 2-3 sentences helping the homeowner understand whether to repair or replace, and what factors to consider in that decision.",
+      "preventiveCare": "List 3-5 specific preventive maintenance actions the homeowner can take to extend roof life and avoid costly repairs."
     }
   },
   "budgetGuidance": {
+    "reportDate": "${today}",
+    "pricingNote": "All estimates reflect current ${currentMonth} ${currentYear} material and labor costs in ${project.location?.city || 'your area'}.",
     "estimatedRange": {
-      "repairs": "Repair range",
-      "partialReplacement": "Partial replacement range",
-      "fullReplacement": "Full replacement range"
+      "repairs": "Provide a specific cost range for repair-only option with explanation",
+      "partialReplacement": "Provide a specific cost range for partial replacement with explanation of what's included",
+      "fullReplacement": "Provide a specific cost range for full replacement in ${project.preferredCurrency || 'USD'} based on ${project.area || 1000} sq ft at current ${currentYear} prices in ${project.location?.city || 'your area'}"
     },
-    "financingOptions": ["Option list"],
-    "costSavingTips": ["Tip list"]
+    "financingOptions": ["List realistic financing options available to homeowners for roofing projects with brief explanation of each"],
+    "costSavingTips": ["List 4-6 specific, actionable money-saving tips for this project, such as timing, material choices, or bundling with other work"]
   },
   "nextSteps": {
-    "recommended": ["Recommendation list"],
-    "questions": ["Question list"],
-    "warningSignsToWatch": ["Warning signs"]
+    "recommended": ["List 3-5 concrete recommended next steps in priority order, written as specific actions the homeowner should take"],
+    "questionsToAskContractors": ["List 5-7 important questions a homeowner should ask when getting contractor quotes for this type of work"],
+    "warningSignsToWatch": ["List 4-6 specific warning signs the homeowner should monitor that would indicate the situation is getting worse and needs faster action"],
+    "whenToCallEmergencyService": "Describe in 1-2 sentences what conditions would require emergency roofing service versus standard scheduling."
   }
 }
 
-Use friendly, non-technical language. Return ONLY valid JSON. No markdown.`;
+CRITICAL INSTRUCTIONS:
+- Return ONLY a valid JSON object
+- Start your response with { and end with }
+- Do NOT include any text before or after the JSON
+- Do NOT use markdown code blocks
+- The JSON must be parseable and complete
+- Use friendly, non-technical language throughout
+
+Return ONLY valid JSON. No markdown, no explanations outside the JSON.`;
 
       default:
-        return `Generate a report in JSON format for project: ${projectData}. Return ONLY valid JSON.`;
+        return `Today's date is ${today}. Generate a report in JSON format for project: ${projectData}. Return ONLY valid JSON.`;
     }
   }
 }
 
 export const realCostCalculator = new RealCostCalculator();
+
+
