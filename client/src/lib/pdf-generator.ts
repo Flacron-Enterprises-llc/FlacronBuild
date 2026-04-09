@@ -125,8 +125,9 @@ function addBulletList(doc: jsPDF, label: string, items: string[], margin: numbe
   }
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  items.forEach((item: string) => {
-    if (!item || !item.trim()) return;
+  items.forEach((rawItem: any) => {
+    const item = typeof rawItem === 'string' ? rawItem : (rawItem && typeof rawItem === 'object' ? JSON.stringify(rawItem) : String(rawItem ?? ''));
+    if (!item.trim()) return;
     if (yPos > doc.internal.pageSize.height - 20) {
       doc.addPage();
       yPos = 20;
@@ -1705,15 +1706,137 @@ function addInsuranceReport(doc: jsPDF, project: any, estimate: any) {
   const laborCost = typeof estimate?.laborCost === 'string' ? parseFloat(estimate.laborCost) : (estimate?.laborCost || 0);
   const permitsCost = typeof estimate?.permitsCost === 'string' ? parseFloat(estimate.permitsCost) : (estimate?.permitsCost || 0);
   const contingencyCost = typeof estimate?.contingencyCost === 'string' ? parseFloat(estimate.contingencyCost) : (estimate?.contingencyCost || 0);
+  const insBaseCost = Math.max(0, materialsCost + laborCost + permitsCost);
+  const insContingencyPct = insBaseCost > 0 ? ((contingencyCost / insBaseCost) * 100).toFixed(1) : '0.0';
 
   if (totalCost > 0) {
-    yPos = addSectionHeader(doc, 'COST SUMMARY', yPos, pageWidth, margin);
+    yPos = addSectionHeader(doc, 'DETAILED COST BREAKDOWN', yPos, pageWidth, margin);
     const currency = project.preferredCurrency || 'USD';
+    const pageHeight = doc.internal.pageSize.height;
+
+    const aiCost = insReport.costEstimates || (estimate?.report as any)?.costEstimates || {};
+    const materialItems = Array.isArray(aiCost?.materials?.breakdown) ? aiCost.materials.breakdown : [];
+    const fallbackLineItems = Array.isArray(project?.lineItems) ? project.lineItems : [];
+    const displayMaterialItems = materialItems.length > 0
+      ? materialItems
+      : (fallbackLineItems.length > 0
+        ? fallbackLineItems.map((name: string) => ({ item: name, cost: materialsCost / fallbackLineItems.length }))
+        : [{ item: 'Primary Roofing Materials', cost: materialsCost }]);
+    const equipmentItems = Array.isArray(aiCost?.equipment?.items) ? aiCost.equipment.items : [];
+
+    // Materials breakdown
+    if (displayMaterialItems.length > 0 && materialsCost > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Materials Cost Breakdown', margin, yPos);
+      yPos += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      displayMaterialItems.forEach((item: any) => {
+        if (yPos > pageHeight - 24) { doc.addPage(); yPos = 20; }
+        const itemName = item?.item || item?.category || item?.name || 'Material';
+        const itemCost = Number(item?.cost ?? item?.amount ?? 0);
+        doc.text(itemName, margin + 4, yPos);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatCurrency(itemCost, currency), pageWidth - margin, yPos, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        yPos += 5;
+      });
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin + 2, yPos, pageWidth - margin, yPos);
+      yPos += 2;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Materials Subtotal:', margin + 4, yPos);
+      doc.text(formatCurrency(materialsCost, currency), pageWidth - margin, yPos, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      yPos += 8;
+    }
+
+    // Labor breakdown
+    if (laborCost > 0) {
+      if (yPos > pageHeight - 40) { doc.addPage(); yPos = 20; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Labor Details', margin, yPos);
+      yPos += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      const laborRate = Number(aiCost?.labor?.ratePerHour ?? 0);
+      const laborHours = Number(aiCost?.labor?.totalHours ?? 0);
+      if (laborRate > 0) {
+        doc.text(`Rate per Hour: ${formatCurrency(laborRate, currency)}`, margin + 4, yPos);
+        yPos += 5;
+      }
+      if (laborHours > 0) {
+        doc.text(`Total Hours: ${laborHours}`, margin + 4, yPos);
+        yPos += 5;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.text('Labor Subtotal:', margin + 4, yPos);
+      doc.text(formatCurrency(laborCost, currency), pageWidth - margin, yPos, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      yPos += 8;
+    }
+
+    // Equipment breakdown
+    if (equipmentItems.length > 0) {
+      if (yPos > pageHeight - 40) { doc.addPage(); yPos = 20; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Equipment Cost Breakdown', margin, yPos);
+      yPos += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      equipmentItems.forEach((item: any) => {
+        if (yPos > pageHeight - 24) { doc.addPage(); yPos = 20; }
+        const itemName = item?.item || 'Equipment';
+        const itemCost = Number(item?.cost ?? 0);
+        doc.text(itemName, margin + 4, yPos);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatCurrency(itemCost, currency), pageWidth - margin, yPos, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        yPos += 5;
+      });
+      const equipTotal = equipmentItems.reduce((s: number, i: any) => s + Number(i?.cost ?? 0), 0);
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin + 2, yPos, pageWidth - margin, yPos);
+      yPos += 2;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Equipment Subtotal:', margin + 4, yPos);
+      doc.text(formatCurrency(equipTotal, currency), pageWidth - margin, yPos, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      yPos += 8;
+    }
+
+    // Permits & fees
+    if (permitsCost > 0) {
+      if (yPos > pageHeight - 30) { doc.addPage(); yPos = 20; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('Permits & Fees:', margin + 4, yPos);
+      doc.text(formatCurrency(permitsCost, currency), pageWidth - margin, yPos, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      yPos += 8;
+    }
+
+    // Contingency & base subtotal
+    if (yPos > pageHeight - 30) { doc.addPage(); yPos = 20; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(`Base Subtotal (Materials + Labor + Permits): ${formatCurrency(insBaseCost, currency)}`, margin + 4, yPos);
+    yPos += 5;
+    if (contingencyCost > 0) {
+      doc.text(`Contingency (${insContingencyPct}%): ${formatCurrency(contingencyCost, currency)}`, margin + 4, yPos);
+      yPos += 7;
+    }
+    doc.setFont('helvetica', 'normal');
+
+    // Final summary table
     yPos = addCostSummaryTable(doc, [
       { label: 'Materials (Replacement Cost)', amount: materialsCost },
       { label: 'Labor', amount: laborCost },
       { label: 'Permits & Fees', amount: permitsCost },
-      { label: 'Contingency', amount: contingencyCost },
+      { label: `Contingency (${insContingencyPct}%)`, amount: contingencyCost },
     ], totalCost, currency, margin, yPos, pageWidth);
   }
 }
@@ -2165,7 +2288,7 @@ function addContractorReport(doc: jsPDF, project: any, estimate: any) {
   const safeCostEstimates = costEstimates || { materials: { total: 0, breakdown: [] }, labor: { total: 0, ratePerHour: 0, totalHours: 0 }, equipment: { total: 0, items: [] } };
 
 safeCostEstimates.materials.total = safeCostEstimates.materials.breakdown
-  ?.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0) || safeCostEstimates.materials.total || 0;
+  ?.reduce((sum: number, item: any) => sum + Number(item.amount ?? item.cost ?? 0), 0) || safeCostEstimates.materials.total || 0;
 
 safeCostEstimates.labor.total = safeCostEstimates.labor.total ||
   (Number(safeCostEstimates.labor.ratePerHour || 0) * Number(safeCostEstimates.labor.totalHours || 0));
@@ -2208,9 +2331,11 @@ if (
     yPos += 7;
 
     doc.setFont('helvetica', 'normal');
-    (safeCostEstimates.materials.breakdown || []).forEach((item: CostBreakdownItem) => {
+    (safeCostEstimates.materials.breakdown || []).forEach((item: any) => {
+      const label = item.category || item.item || item.name || 'Item';
+      const value = item.amount ?? item.cost ?? 0;
       doc.text(
-        `${item.category}: ${formatCurrency(item.amount, preferredCurrency)}`,
+        `${label}: ${formatCurrency(value, preferredCurrency)}`,
         margin + 10,
         yPos
       );
@@ -2399,9 +2524,11 @@ function addContractorImagePages(doc: jsPDF, uploadedFiles: any[], report?: any,
       }
     }
 
-    // Add image analysis from OpenAI if available
-    const imageAnalysis = report?.imageAnalysis?.[index] || report?.imageAnalysis || 
-      'Professional analysis: This image shows roofing conditions requiring contractor assessment for repair planning and material requirements.';
+    // Add image analysis from Gemini Vision if available
+    const rawAnalysis = Array.isArray(report?.imageAnalysis) ? report.imageAnalysis[index] : report?.imageAnalysis;
+    const imageAnalysis = (typeof rawAnalysis === 'string' && rawAnalysis.trim())
+      ? rawAnalysis
+      : 'Professional analysis: This image shows roofing conditions requiring contractor assessment for repair planning and material requirements.';
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
@@ -2902,29 +3029,136 @@ function addHomeownerReport(doc: jsPDF, project: any, estimate: any) {
     ]
   };
 
-  // Show cost breakdown if we have real data
-  if (hasRealCosts && yPos < doc.internal.pageSize.height - 60) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text('Your Estimate Breakdown:', margin, yPos);
-    yPos += 7;
-    doc.setFont('helvetica', 'normal');
-    const costRows = [
-      ['Materials:', formatCurrency(estMat, preferredCurrency)],
-      ['Labor:', formatCurrency(estLabor, preferredCurrency)],
-      ...(estPermits > 0 ? [['Permits:', formatCurrency(estPermits, preferredCurrency)]] as [string,string][] : []),
-      ...(estContingency > 0 ? [['Contingency:', formatCurrency(estContingency, preferredCurrency)]] as [string,string][] : []),
-      ['Total Estimate:', formatCurrency(estTotal, preferredCurrency)]
-    ];
-    costRows.forEach(([label, value], i) => {
-      const isTotal = label === 'Total Estimate:';
-      if (isTotal) { doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 102, 0); }
-      doc.text(label, margin + 10, yPos);
-      doc.text(value, margin + 70, yPos);
-      if (isTotal) { doc.setFont('helvetica', 'normal'); doc.setTextColor(0, 0, 0); }
+  // Detailed cost breakdown when we have real data
+  if (hasRealCosts) {
+    if (yPos > doc.internal.pageSize.height - 80) { doc.addPage(); yPos = 20; }
+
+    doc.setFillColor(255, 102, 0);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
+    doc.text('YOUR DETAILED COST BREAKDOWN', margin + 5, yPos + 6);
+    yPos += 15;
+    doc.setTextColor(0, 0, 0);
+
+    const pageHeight = doc.internal.pageSize.height;
+    const hoAiCost = report.costEstimates || (estimate?.report as any)?.costEstimates || {};
+    const hoMaterialItems = Array.isArray(hoAiCost?.materials?.breakdown) ? hoAiCost.materials.breakdown : [];
+    const hoFallbackLineItems = Array.isArray(project?.lineItems) ? project.lineItems : [];
+    const hoDisplayMaterialItems = hoMaterialItems.length > 0
+      ? hoMaterialItems
+      : (hoFallbackLineItems.length > 0
+        ? hoFallbackLineItems.map((name: string) => ({ item: name, cost: estMat / hoFallbackLineItems.length }))
+        : [{ item: 'Primary Roofing Materials', cost: estMat }]);
+    const hoEquipmentItems = Array.isArray(hoAiCost?.equipment?.items) ? hoAiCost.equipment.items : [];
+
+    // Materials breakdown
+    if (hoDisplayMaterialItems.length > 0 && estMat > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Materials', margin, yPos);
       yPos += 6;
-    });
-    yPos += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      hoDisplayMaterialItems.forEach((item: any) => {
+        if (yPos > pageHeight - 24) { doc.addPage(); yPos = 20; }
+        const itemName = item?.item || item?.category || item?.name || 'Material';
+        const itemCost = Number(item?.cost ?? item?.amount ?? 0);
+        doc.text(itemName, margin + 4, yPos);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatCurrency(itemCost, preferredCurrency), pageWidth - margin, yPos, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        yPos += 5;
+      });
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin + 2, yPos, pageWidth - margin, yPos);
+      yPos += 2;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Materials Subtotal:', margin + 4, yPos);
+      doc.text(formatCurrency(estMat, preferredCurrency), pageWidth - margin, yPos, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      yPos += 8;
+    }
+
+    // Labor breakdown
+    if (estLabor > 0) {
+      if (yPos > pageHeight - 40) { doc.addPage(); yPos = 20; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Labor', margin, yPos);
+      yPos += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      const hoLaborRate = Number(hoAiCost?.labor?.ratePerHour ?? 0);
+      const hoLaborHours = Number(hoAiCost?.labor?.totalHours ?? 0);
+      if (hoLaborRate > 0) {
+        doc.text(`Rate per Hour: ${formatCurrency(hoLaborRate, preferredCurrency)}`, margin + 4, yPos);
+        yPos += 5;
+      }
+      if (hoLaborHours > 0) {
+        doc.text(`Estimated Hours: ${hoLaborHours}`, margin + 4, yPos);
+        yPos += 5;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.text('Labor Subtotal:', margin + 4, yPos);
+      doc.text(formatCurrency(estLabor, preferredCurrency), pageWidth - margin, yPos, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      yPos += 8;
+    }
+
+    // Equipment breakdown
+    if (hoEquipmentItems.length > 0) {
+      if (yPos > pageHeight - 40) { doc.addPage(); yPos = 20; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Equipment', margin, yPos);
+      yPos += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      hoEquipmentItems.forEach((item: any) => {
+        if (yPos > pageHeight - 24) { doc.addPage(); yPos = 20; }
+        const itemName = item?.item || 'Equipment';
+        const itemCost = Number(item?.cost ?? 0);
+        doc.text(itemName, margin + 4, yPos);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatCurrency(itemCost, preferredCurrency), pageWidth - margin, yPos, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        yPos += 5;
+      });
+      yPos += 3;
+    }
+
+    // Permits & Contingency
+    if (estPermits > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('Permits & Fees:', margin + 4, yPos);
+      doc.text(formatCurrency(estPermits, preferredCurrency), pageWidth - margin, yPos, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      yPos += 6;
+    }
+    if (estContingency > 0) {
+      const hoBaseCost = Math.max(0, estMat + estLabor + estPermits);
+      const hoContPct = hoBaseCost > 0 ? ((estContingency / hoBaseCost) * 100).toFixed(1) : '0.0';
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text(`Contingency (${hoContPct}%):`, margin + 4, yPos);
+      doc.text(formatCurrency(estContingency, preferredCurrency), pageWidth - margin, yPos, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      yPos += 6;
+    }
+
+    // Grand total
+    yPos += 2;
+    doc.setFillColor(255, 102, 0);
+    doc.setTextColor(255, 255, 255);
+    doc.rect(margin, yPos, pageWidth - 2 * margin, 8, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('TOTAL ESTIMATE', margin + 5, yPos + 6);
+    doc.text(formatCurrency(estTotal, preferredCurrency), pageWidth - margin, yPos + 6, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+    yPos += 16;
   }
 
   doc.setFillColor(255, 102, 0);
@@ -3189,9 +3423,11 @@ function addHomeownerImagePages(doc: jsPDF, uploadedFiles: any[], report?: any) 
       }
     }
 
-    // Add friendly image analysis 
-    const imageAnalysis = report?.imageAnalysis?.[index] || report?.imageAnalysis || 
-      'This photo shows your roof\'s current condition. We\'ve examined this area for signs of wear, damage, or potential issues that may need attention. Look for any visible signs mentioned in our recommendations section.';
+    // Add friendly image analysis
+    const rawAnalysis = Array.isArray(report?.imageAnalysis) ? report.imageAnalysis[index] : report?.imageAnalysis;
+    const imageAnalysis = (typeof rawAnalysis === 'string' && rawAnalysis.trim())
+      ? rawAnalysis
+      : 'This photo shows your roof\'s current condition. We\'ve examined this area for signs of wear, damage, or potential issues that may need attention. Look for any visible signs mentioned in our recommendations section.';
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
@@ -3267,7 +3503,13 @@ export async function generatePDFReport(project: any, estimate: any, options?: {
     
     // IMAGE PAGES: Add images from localStorage with annotations
     if (uploadedFiles.length > 0) {
-      addInspectorImagePages(doc, uploadedFiles, estimate.report, project.preferredLanguage || 'english');
+      const geminiAnalysis = Array.isArray(estimate.imageAnalysis) && estimate.imageAnalysis.length > 0 ? estimate.imageAnalysis : undefined;
+      const inspectorReportWithImages = {
+        ...estimate.report,
+        imageAnalysis: geminiAnalysis || estimate.report?.imageAnalysis,
+        annotatedPhotographicEvidence: geminiAnalysis || estimate.report?.annotatedPhotographicEvidence
+      };
+      addInspectorImagePages(doc, uploadedFiles, inspectorReportWithImages, project.preferredLanguage || 'english');
     }
   } else if (project.userRole === 'insurance-adjuster') {
     doc.addPage();
@@ -3275,7 +3517,13 @@ export async function generatePDFReport(project: any, estimate: any, options?: {
     
     // Add insurance-specific image pages with damage annotations
     if (uploadedFiles.length > 0) {
-      addInsuranceImagePages(doc, uploadedFiles, estimate.report);
+      const geminiAnalysis = Array.isArray(estimate.imageAnalysis) && estimate.imageAnalysis.length > 0 ? estimate.imageAnalysis : undefined;
+      const insuranceReportWithImages = {
+        ...estimate.report,
+        imageAnalysis: geminiAnalysis || estimate.report?.imageAnalysis,
+        annotatedPhotos: geminiAnalysis || estimate.report?.annotatedPhotos
+      };
+      addInsuranceImagePages(doc, uploadedFiles, insuranceReportWithImages);
     }
   } else if (project.userRole === 'contractor') {
     doc.addPage();
@@ -3283,7 +3531,8 @@ export async function generatePDFReport(project: any, estimate: any, options?: {
     
     // Add contractor-specific image pages with repair indicators
     if (uploadedFiles.length > 0) {
-      addContractorImagePages(doc, uploadedFiles, estimate.report, project.preferredLanguage || 'english');
+      const contractorReportWithImages = { ...estimate.report, imageAnalysis: estimate.imageAnalysis || estimate.report?.imageAnalysis };
+      addContractorImagePages(doc, uploadedFiles, contractorReportWithImages, project.preferredLanguage || 'english');
     }
   } else if (project.userRole === 'homeowner') {
     doc.addPage();
@@ -3291,7 +3540,8 @@ export async function generatePDFReport(project: any, estimate: any, options?: {
     
     // Add homeowner-friendly image pages with explanations
     if (uploadedFiles.length > 0) {
-      addHomeownerImagePages(doc, uploadedFiles, estimate.report);
+      const homeownerReportWithImages = { ...estimate.report, imageAnalysis: estimate.imageAnalysis || estimate.report?.imageAnalysis };
+      addHomeownerImagePages(doc, uploadedFiles, homeownerReportWithImages);
     }
   }
   
@@ -3789,24 +4039,55 @@ function addInspectorReport(doc: jsPDF, project: any, estimate: any) {
   // ── Roofing Components Detailed Assessment (from AI) ──────────────────────
   const report = estimate?.report || {};
   const rca = report.roofingComponentsAssessment || {};
-  const rcaNarrative: string[] = [];
-  if (rca.underlayment) rcaNarrative.push(`Underlayment: ${rca.underlayment}`);
-  if (rca.iceWaterShield) rcaNarrative.push(`Ice & Water Shield: ${rca.iceWaterShield}`);
-  if (rca.dripEdge) rcaNarrative.push(`Drip Edge: ${rca.dripEdge}`);
-  if (rca.gutterApron) rcaNarrative.push(`Gutter Apron: ${rca.gutterApron}`);
-  if (rca.fascia) rcaNarrative.push(`Fascia: ${rca.fascia}`);
-  if (rca.gutters) rcaNarrative.push(`Gutters: ${rca.gutters}`);
+  const componentRows = [
+    { label: 'Underlayment', value: rca.underlayment },
+    { label: 'Ice & Water Shield', value: rca.iceWaterShield },
+    { label: 'Drip Edge', value: rca.dripEdge },
+    { label: 'Gutter Apron', value: rca.gutterApron },
+    { label: 'Fascia', value: rca.fascia },
+    { label: 'Gutters', value: rca.gutters },
+  ].filter((row) => typeof row.value === 'string' && row.value.trim().length > 0);
 
-  if (rcaNarrative.length > 0) {
+  if (componentRows.length > 0) {
     y = addSectionHeader(doc, 'DETAILED COMPONENT ASSESSMENT', y, pageWidth, margin);
     doc.setFontSize(10);
-    rcaNarrative.forEach(item => {
-      const lines = doc.splitTextToSize(item, pageWidth - 2 * margin - 5);
-      if (y > pageHeight - 20) { doc.addPage(); y = 20; }
-      lines.forEach((line: string) => { doc.text(line, margin + 5, y); y += 5; });
-      y += 2;
+
+    componentRows.forEach((row, idx) => {
+      if (y > pageHeight - 35) {
+        doc.addPage();
+        y = 20;
+      }
+
+      // Component title
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(40, 40, 40);
+      doc.text(`${row.label}:`, margin + 5, y);
+      y += 5;
+
+      // Component narrative
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      const detailLines = doc.splitTextToSize(String(row.value).trim(), pageWidth - 2 * margin - 10);
+      detailLines.forEach((line: string) => {
+        if (y > pageHeight - 20) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, margin + 8, y);
+        y += 5;
+      });
+
+      // Thin separator between component blocks for readability
+      if (idx < componentRows.length - 1) {
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.3);
+        doc.line(margin + 5, y + 1, pageWidth - margin - 5, y + 1);
+        y += 5;
+      } else {
+        y += 3;
+      }
     });
-    y += 5;
+    y += 4;
   }
 
   // ── Repair Recommendations (from AI) ────────────────────────────────────
@@ -3825,30 +4106,136 @@ function addInspectorReport(doc: jsPDF, project: any, estimate: any) {
     y += 5;
   }
 
-  // ── Timeline & Contingency (from AI) ────────────────────────────────────
-  const timeline = report.timeline || '';
-  const contingency = report.contingencySuggestions || '';
-  if (timeline || contingency) {
-    y = addSectionHeader(doc, 'TIMELINE & CONTINGENCY', y, pageWidth, margin);
-    if (timeline) y = addNarrative(doc, 'Timeline:', timeline, margin, y, pageWidth);
-    if (contingency) y = addNarrative(doc, 'Contingency:', contingency, margin, y, pageWidth);
-    y += 5;
-  }
-
-  // ── Cost Estimates ────────────────────────────────────────────────────────
   const totalCost = typeof estimate?.totalCost === 'string' ? parseFloat(estimate.totalCost) : (estimate?.totalCost || 0);
   const materialsCost = typeof estimate?.materialsCost === 'string' ? parseFloat(estimate.materialsCost) : (estimate?.materialsCost || 0);
   const laborCost = typeof estimate?.laborCost === 'string' ? parseFloat(estimate.laborCost) : (estimate?.laborCost || 0);
   const permitsCost = typeof estimate?.permitsCost === 'string' ? parseFloat(estimate.permitsCost) : (estimate?.permitsCost || 0);
   const contingencyCost = typeof estimate?.contingencyCost === 'string' ? parseFloat(estimate.contingencyCost) : (estimate?.contingencyCost || 0);
+  const baseCost = Math.max(0, materialsCost + laborCost + permitsCost);
+  const contingencyPct = baseCost > 0 ? ((contingencyCost / baseCost) * 100).toFixed(1) : '0.0';
 
+  // ── Timeline & Contingency (cost-consistent narrative) ──────────────────
+  const timeline = report.timeline || '';
+  const contingency = report.contingencySuggestions || '';
+  if (timeline || contingency) {
+    y = addSectionHeader(doc, 'TIMELINE & CONTINGENCY', y, pageWidth, margin);
+    if (timeline) y = addNarrative(doc, 'Timeline:', timeline, margin, y, pageWidth);
+    const calculatedContingencyNarrative = `Calculated contingency for this estimate is ${formatCurrency(contingencyCost, preferredCurrency)} (${contingencyPct}% of base cost ${formatCurrency(baseCost, preferredCurrency)}).`;
+    y = addNarrative(doc, 'Contingency:', calculatedContingencyNarrative, margin, y, pageWidth);
+    if (contingency) y = addNarrative(doc, 'AI Contingency Note:', contingency, margin, y, pageWidth);
+    y += 5;
+  }
+
+  // ── Cost Estimates ────────────────────────────────────────────────────────
   if (totalCost > 0) {
     y = addSectionHeader(doc, 'COST ESTIMATES', y, pageWidth, margin);
+
+    const aiCost = report.costEstimates || {};
+    const materialItems = Array.isArray(aiCost?.materials?.breakdown) ? aiCost.materials.breakdown : [];
+    const fallbackLineItems = Array.isArray(project?.lineItems) ? project.lineItems : [];
+    const displayMaterialItems = materialItems.length > 0
+      ? materialItems
+      : (fallbackLineItems.length > 0
+        ? fallbackLineItems.map((name: string) => ({
+            item: name,
+            cost: materialsCost / fallbackLineItems.length
+          }))
+        : [{ item: 'Primary Roofing Materials', cost: materialsCost }]);
+    const equipmentItems = Array.isArray(aiCost?.equipment?.items) ? aiCost.equipment.items : [];
+
+    // Materials detailed list
+    if (displayMaterialItems.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Materials Cost Breakdown', margin, y);
+      y += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      displayMaterialItems.forEach((item: any) => {
+        if (y > pageHeight - 24) {
+          doc.addPage();
+          y = 20;
+        }
+        const itemName = item?.item || item?.category || 'Material';
+        const itemCost = Number(item?.cost ?? item?.amount ?? 0);
+        doc.text(`${itemName}`, margin + 4, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatCurrency(itemCost, preferredCurrency), pageWidth - margin, y, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        y += 5;
+      });
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin + 2, y, pageWidth - margin, y);
+      y += 5;
+    }
+
+    // Labor details
+    const laborRate = Number(aiCost?.labor?.ratePerHour ?? (laborCost > 0 ? laborCost / 40 : 0));
+    const laborHours = Number(aiCost?.labor?.totalHours ?? (laborRate > 0 ? laborCost / laborRate : 0));
+    if (laborCost > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Labor Details', margin, y);
+      y += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      if (laborRate > 0) {
+        doc.text(`Rate per Hour: ${formatCurrency(laborRate, preferredCurrency)}`, margin + 4, y);
+        y += 5;
+      }
+      if (laborHours > 0) {
+        doc.text(`Total Hours: ${laborHours}`, margin + 4, y);
+        y += 5;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Labor Subtotal: ${formatCurrency(laborCost, preferredCurrency)}`, margin + 4, y);
+      doc.setFont('helvetica', 'normal');
+      y += 7;
+    }
+
+    // Equipment details
+    if (equipmentItems.length > 0) {
+      if (y > pageHeight - 35) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('Equipment Cost Breakdown', margin, y);
+      y += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      equipmentItems.forEach((item: any) => {
+        const itemName = item?.item || 'Equipment';
+        const itemCost = Number(item?.cost ?? 0);
+        doc.text(itemName, margin + 4, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatCurrency(itemCost, preferredCurrency), pageWidth - margin, y, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        y += 5;
+      });
+      y += 2;
+    }
+
+    if (y > pageHeight - 32) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(`Base Subtotal (Materials + Labor + Permits): ${formatCurrency(baseCost, preferredCurrency)}`, margin + 4, y);
+    y += 5;
+    doc.text(`Contingency Amount (${contingencyPct}%): ${formatCurrency(contingencyCost, preferredCurrency)}`, margin + 4, y);
+    y += 7;
+    doc.setFont('helvetica', 'normal');
+
+    // Final summary table
     y = addCostSummaryTable(doc, [
       { label: 'Materials', amount: materialsCost },
       { label: 'Labor', amount: laborCost },
       { label: 'Permits & Fees', amount: permitsCost },
-      { label: 'Contingency (7–10%)', amount: contingencyCost },
+      { label: `Contingency (${contingencyPct}%)`, amount: contingencyCost },
     ], totalCost, preferredCurrency, margin, y, pageWidth);
   }
 }

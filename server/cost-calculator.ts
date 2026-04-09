@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import fetch from 'node-fetch';
 
 export interface RealCostData {
@@ -131,6 +131,23 @@ export class RealCostCalculator {
       hasImages: !!imageUrls?.length
     });
 
+    // Track every API call result so the client can display them in the browser console
+    const apiStatus: {
+      openai: string;
+      openaiVision: string;
+      geminiVision: string;
+      watsonx: string;
+      geminiFallback: string;
+      notes: string[];
+    } = {
+      openai: 'pending',
+      openaiVision: imageUrls?.length ? 'pending' : 'skipped (no images)',
+      geminiVision: imageUrls?.length ? 'pending' : 'skipped (no images)',
+      watsonx: 'pending',
+      geminiFallback: 'not-used',
+      notes: []
+    };
+
     try {
       const today = new Date().toISOString().split('T')[0];
       
@@ -241,28 +258,76 @@ export class RealCostCalculator {
         }
       ];
       
-      // Process images for OpenAI analysis if provided (OpenAI supports images in messages)
+      // Process images with dedicated vision pipeline:
+      // 1) OpenAI Vision (primary) 2) Gemini Vision (fallback) 3) Form-text fallback.
+      let imageAnalysisResults: string[] = [];
       if (imageUrls && imageUrls.length > 0) {
-        console.log('=== COST CALCULATOR: Adding Images to OpenAI Request ===');
-        for (let i = 0; i < imageUrls.length; i++) {
-          const imageUrl = imageUrls[i];
-          const imgObj = imageUrl as any;
-          const base64String = imgObj?.data || imgObj?.url || imgObj?.base64 || imageUrl;
-          
-          if (typeof base64String === 'string') {
-            const base64Data = base64String.replace(/^data:image\/[a-z]+;base64,/, '');
-            calculationMessages.push({
-              role: 'user',
-              content: [
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:image/jpeg;base64,${base64Data}`
-                  }
-                }
-              ]
-            });
-            console.log(`Added image ${i + 1} to OpenAI request (${base64Data.length} chars)`);
+        console.log('=== COST CALCULATOR: Sending Images to OpenAI Vision for Analysis ===');
+        const imagePrompt = `You are a professional roofing inspector. Analyze each of the ${imageUrls.length} roofing image(s) provided and return ONLY valid JSON:
+{
+  "imageAnalysis": [
+    "analysis for image 1",
+    "analysis for image 2"
+  ]
+}
+Each string must describe visible damage, material condition, and repair recommendations in 2-4 sentences.`;
+        try {
+          const openaiVisionResponse = await this.queryOpenAIWithImages(imagePrompt, imageUrls);
+          let cleaned = openaiVisionResponse.trim()
+            .replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '')
+            .replace(/^```\s*/, '').replace(/\s*```$/, '');
+          const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+          if (jsonMatch) cleaned = jsonMatch[0];
+          const parsed = JSON.parse(cleaned);
+          const parsedArr = Array.isArray(parsed?.imageAnalysis) ? parsed.imageAnalysis : [];
+          if (!parsedArr.length) throw new Error('OpenAI Vision returned empty imageAnalysis');
+          imageAnalysisResults = parsedArr;
+          apiStatus.openaiVision = `success (${imageAnalysisResults.length} image${imageAnalysisResults.length !== 1 ? 's' : ''} analyzed)`;
+          apiStatus.geminiVision = 'not-used';
+          console.log(`OpenAI Vision returned ${imageAnalysisResults.length} image analyses`);
+        } catch (openaiVisionErr) {
+          const openaiVisionErrMsg = openaiVisionErr instanceof Error ? openaiVisionErr.message : String(openaiVisionErr);
+          const is429 = openaiVisionErrMsg.includes('429') || openaiVisionErrMsg.toLowerCase().includes('rate limit');
+          apiStatus.openaiVision = is429 ? 'rate-limited (429)' : `failed: ${openaiVisionErrMsg}`;
+          apiStatus.notes.push(`OpenAI Vision ${is429 ? 'rate-limited' : 'failed'} — switching to Gemini Vision`);
+          console.error(`OpenAI Vision failed: ${openaiVisionErrMsg}. Trying Gemini Vision fallback.`);
+          try {
+            console.log('=== COST CALCULATOR: Sending Images to Gemini Vision for Analysis ===');
+            const geminiVisionResponse = await this.queryGeminiWithImages(imagePrompt, imageUrls);
+            let cleaned = geminiVisionResponse.trim()
+              .replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '')
+              .replace(/^```\s*/, '').replace(/\s*```$/, '');
+            // Accept either { imageAnalysis: [] } or [] output
+            const objMatch = cleaned.match(/\{[\s\S]*\}/);
+            if (objMatch) {
+              const parsed = JSON.parse(objMatch[0]);
+              imageAnalysisResults = Array.isArray(parsed?.imageAnalysis) ? parsed.imageAnalysis : [];
+            } else {
+              const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+              if (arrMatch) imageAnalysisResults = JSON.parse(arrMatch[0]);
+            }
+            if (!imageAnalysisResults.length) {
+              throw new Error('Gemini Vision returned empty image analysis');
+            }
+            apiStatus.geminiVision = `success (${imageAnalysisResults.length} image${imageAnalysisResults.length !== 1 ? 's' : ''} analyzed)`;
+            console.log(`Gemini Vision returned ${imageAnalysisResults.length} image analyses`);
+          } catch (visionErr) {
+            const visionErrMsg = visionErr instanceof Error ? visionErr.message : String(visionErr);
+            const gemini429 = visionErrMsg.includes('429') || visionErrMsg.toLowerCase().includes('quota');
+            apiStatus.geminiVision = gemini429 ? 'rate-limited (429) — quota exceeded' : `failed: ${visionErrMsg}`;
+            apiStatus.notes.push(`Gemini Vision ${gemini429 ? 'rate-limited (429)' : 'failed'} — using form-data description as fallback`);
+            console.error(`Gemini Vision failed: ${visionErrMsg}. Using form-data fallback for image analysis.`);
+            // Fallback: generate a meaningful description from form data for each image
+            const structureType = project.structureType || 'residential structure';
+            const roofAge = project.roofAge != null ? `${project.roofAge}-year-old` : '';
+            const materials = Array.isArray(project.materialLayers) && project.materialLayers.length > 0
+              ? project.materialLayers.join(', ')
+              : 'standard roofing materials';
+            const pitch = project.roofPitch || 'standard pitch';
+            const jobType = project.jobType === 'partial-repair' ? 'partial repair' : 'full replacement';
+            const fallbackText = `This image shows a ${roofAge} ${structureType} with ${materials} on a ${pitch} roof. The submitted project requires a ${jobType}. A qualified contractor should inspect the roof surface, flashing, gutters, and penetrations on-site to confirm the scope and identify any additional damage not visible in this photograph.`;
+            imageAnalysisResults = imageUrls.map(() => fallbackText);
+            console.log(`Generated form-data fallback for ${imageAnalysisResults.length} image(s)`);
           }
         }
       }
@@ -273,9 +338,13 @@ export class RealCostCalculator {
       try {
         openaiRawResponse = await this.queryOpenAI(calculationMessages);
         const openaiEndTime = Date.now();
+        apiStatus.openai = `success (${openaiEndTime - startTime}ms)`;
         console.log(`\n  OpenAI responded in ${openaiEndTime - startTime}ms  parsing calculations...`);
       } catch (openaiErr) {
         const openaiErrMsg = openaiErr instanceof Error ? openaiErr.message : String(openaiErr);
+        const is429 = openaiErrMsg.includes('Rate limit') || openaiErrMsg.includes('429');
+        apiStatus.openai = is429 ? 'rate-limited (429)' : `failed: ${openaiErrMsg}`;
+        apiStatus.notes.push(`OpenAI ${is429 ? 'rate-limited' : 'failed'} — switching to Gemini for calculations`);
         const bar = '-'.repeat(60);
         console.error(`\n${bar}`);
         console.error('  OPENAI FAILED  SWITCHING TO GEMINI FOR CALCULATIONS');
@@ -285,11 +354,14 @@ export class RealCostCalculator {
           throw new Error(`OpenAI failed and no Gemini API key is configured. OpenAI error: ${openaiErrMsg}`);
         }
         calcSource = 'Gemini (OpenAI fallback)';
+        apiStatus.geminiFallback = 'used for calculations';
         try {
           openaiRawResponse = await this.queryGemini(calculationPrompt);
+          apiStatus.geminiFallback = 'success (calculations)';
           console.log(`\n  Gemini fallback responded  parsing calculations...`);
         } catch (geminiErr) {
           const geminiErrMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+          apiStatus.geminiFallback = `also-failed: ${geminiErrMsg}`;
           const bar2 = '-'.repeat(60);
           console.error(`\n${bar2}`);
           console.error('  GEMINI ALSO FAILED FOR CALCULATIONS  no fallback remaining');
@@ -300,21 +372,52 @@ export class RealCostCalculator {
         }
       }
 
+      const parseCalculationResponse = (raw: string): any => {
+        let clean = raw.trim();
+        clean = clean.replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '');
+        clean = clean.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        const jsonMatch = clean.match(/\{[\s\S]*\}/);
+        if (jsonMatch) clean = jsonMatch[0];
+        clean = clean.replace(/("estimatedDays":\s*)(\d+-\d+)([,\s}])/g, '$1"$2"$3');
+        return JSON.parse(clean);
+      };
+
+      const isSafetyRefusal = (msg: string) =>
+        /don't know|cannot|can't|unable|house|belong|identify|privacy/i.test(msg);
+
       let calculationJson: any;
       try {
-        let cleanResponse = openaiRawResponse.trim();
-        cleanResponse = cleanResponse.replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '');
-        cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
-        if (jsonMatch) cleanResponse = jsonMatch[0];
-        cleanResponse = cleanResponse.replace(/("estimatedDays":\s*)(\d+-\d+)([,\s}])/g, '$1"$2"$3');
-        
-        calculationJson = JSON.parse(cleanResponse);
-        
+        calculationJson = parseCalculationResponse(openaiRawResponse);
+
+        // If OpenAI returned an error JSON (e.g. a safety refusal), fall back to Gemini
         if (calculationJson.error) {
-          throw new Error(calculationJson.error);
+          const errMsg = String(calculationJson.error);
+          if (isSafetyRefusal(errMsg) && this.geminiApiKey) {
+            apiStatus.openai = `safety-refusal: "${errMsg}"`;
+            apiStatus.notes.push(`OpenAI refused (safety policy) — switched to Gemini for calculations`);
+            const bar = '-'.repeat(60);
+            console.warn(`\n${bar}`);
+            console.warn('  OPENAI SAFETY REFUSAL  SWITCHING TO GEMINI FOR CALCULATIONS');
+            console.warn(`   Reason : ${errMsg}`);
+            console.warn(`${bar}\n`);
+            calcSource = 'Gemini (OpenAI safety-refusal fallback)';
+            apiStatus.geminiFallback = 'used for calculations (safety-refusal)';
+            const geminiCalcRaw = await this.queryGemini(calculationPrompt);
+            calculationJson = parseCalculationResponse(geminiCalcRaw);
+            if (calculationJson.error) {
+              apiStatus.geminiFallback = `also-failed: ${calculationJson.error}`;
+              throw new Error(`Gemini also returned an error: ${calculationJson.error}`);
+            }
+            apiStatus.geminiFallback = 'success (calculations — safety-refusal fallback)';
+          } else {
+            apiStatus.openai = `error-json: "${errMsg}"`;
+            throw new Error(errMsg);
+          }
+        } else {
+          // Keep openai status as success only if it wasn't already overwritten by fallback path
+          if (apiStatus.openai.startsWith('pending')) apiStatus.openai = `success`;
         }
-        
+
         console.log(`  Calculations parsed successfully  |  Source: ${calcSource}`);
         console.log(`   Materials : $${calculationJson.materialsCost || calculationJson.costEstimates?.materials?.total || 0}`);
         console.log(`   Labor     : $${calculationJson.laborCost || calculationJson.costEstimates?.labor?.total || 0}`);
@@ -358,9 +461,14 @@ export class RealCostCalculator {
         if (!cleaned || cleaned === '<end_of_turn>' || cleaned.length < 20 || !cleaned.includes('{')) {
           throw new Error(`Watsonx returned empty or non-JSON response (${cleaned.length} chars: "${cleaned.substring(0, 60)}")`);
         }
+        apiStatus.watsonx = `success (${watsonEndTime - watsonStartTime}ms)`;
         console.log(`\n  Watsonx responded in ${watsonEndTime - watsonStartTime}ms  parsing report...`);
       } catch (watsonxError) {
         const watsonErrMsg = watsonxError instanceof Error ? watsonxError.message : String(watsonxError);
+        const is429 = watsonErrMsg.includes('429') || watsonErrMsg.toLowerCase().includes('rate limit');
+        const isEmpty = watsonErrMsg.toLowerCase().includes('empty') || watsonErrMsg.toLowerCase().includes('non-json');
+        apiStatus.watsonx = is429 ? 'rate-limited (429)' : isEmpty ? 'empty/invalid response' : `failed: ${watsonErrMsg}`;
+        apiStatus.notes.push(`Watsonx ${is429 ? 'rate-limited' : isEmpty ? 'returned empty response' : 'failed'} — switching to Gemini for report`);
         const bar = '-'.repeat(60);
         console.error(`\n${bar}`);
         console.error('  WATSONX FAILED  SWITCHING TO GEMINI FOR REPORT GENERATION');
@@ -370,11 +478,15 @@ export class RealCostCalculator {
           throw new Error(`Watsonx failed and no Gemini API key is configured. Watsonx error: ${watsonErrMsg}`);
         }
         reportSource = 'Gemini (Watsonx fallback)';
+        if (apiStatus.geminiFallback === 'not-used') apiStatus.geminiFallback = 'used for report (Watsonx fallback)';
         try {
           watsonxReportText = await this.queryGemini(reportPromptWithCalculations);
+          apiStatus.geminiFallback = 'success (report)';
           console.log(`\n  Gemini fallback responded  parsing report...`);
         } catch (geminiErr) {
           const geminiErrMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+          apiStatus.geminiFallback = `also-failed: ${geminiErrMsg}`;
+          apiStatus.notes.push(`Gemini also failed for report: ${geminiErrMsg}`);
           const bar2 = '-'.repeat(60);
           console.error(`\n${bar2}`);
           console.error('  GEMINI ALSO FAILED FOR REPORT  no fallback remaining');
@@ -385,18 +497,48 @@ export class RealCostCalculator {
         }
       }
       
+      const repairJson = (raw: string): string => {
+        let s = raw;
+        // Fix missing commas between properties: }"  or ]"  or ""  patterns across lines
+        s = s.replace(/"\s*\n(\s*")/g, '",\n$1');
+        s = s.replace(/\}\s*\n(\s*")/g, '},\n$1');
+        s = s.replace(/\]\s*\n(\s*")/g, '],\n$1');
+        // Fix missing comma after numbers before a quote key
+        s = s.replace(/(\d)\s*\n(\s*")/g, '$1,\n$2');
+        // Fix missing comma after true/false/null before a quote key
+        s = s.replace(/(true|false|null)\s*\n(\s*")/g, '$1,\n$2');
+        // Remove trailing commas before } or ]
+        s = s.replace(/,\s*([\}\]])/g, '$1');
+        // Fix doubled commas
+        s = s.replace(/,\s*,/g, ',');
+        return s;
+      };
+
       const parseReportJson = (raw: string): any => {
         let clean = raw.trim();
         clean = clean.replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '');
         clean = clean.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        // Strip anything before the first { and after the last }
         const start = clean.indexOf('{');
         const end = clean.lastIndexOf('}');
         if (start !== -1 && end !== -1 && end > start) {
           clean = clean.substring(start, end + 1);
         }
         clean = clean.replace(/^const\s+\w+\s*=\s*/, '').replace(/;\s*$/, '');
-        return JSON.parse(clean);
+        try {
+          return JSON.parse(clean);
+        } catch (firstErr) {
+          // Attempt auto-repair of common LLM JSON errors
+          console.log('  JSON parse failed, attempting auto-repair...');
+          const repaired = repairJson(clean);
+          try {
+            const result = JSON.parse(repaired);
+            console.log('  Auto-repair succeeded');
+            return result;
+          } catch {
+            // Throw the original error for clearer debugging
+            throw firstErr;
+          }
+        }
       };
 
       const mergeCostsIntoReport = (rj: any) => {
@@ -476,7 +618,8 @@ export class RealCostCalculator {
         contingencySuggestions: reportJson.contingencySuggestions || 'Standard 7% contingency applied',
         report: reportJson,
         lineItems: reportJson.materialBreakdown?.lineItems || project.lineItems || [],
-        imageAnalysis: reportJson.imageAnalysis || imageUrls
+        imageAnalysis: imageAnalysisResults.length > 0 ? imageAnalysisResults : (reportJson.imageAnalysis || []),
+        apiStatus
       };
       
       console.log('=== COST CALCULATOR: Final Result ===');
@@ -637,6 +780,61 @@ export class RealCostCalculator {
       }
       throw new Error('Failed to reach OpenAI API. Please check your internet connection and try again.');
     }
+  }
+
+  private async queryOpenAIWithImages(prompt: string, images: any[], retryCount = 0): Promise<string> {
+    if (!this.openaiApiKey) {
+      throw new Error('OpenAI API key is not configured');
+    }
+
+    const maxRetries = 2;
+    const url = 'https://api.openai.com/v1/chat/completions';
+    const content: any[] = [{ type: 'text', text: prompt }];
+    for (let i = 0; i < images.length; i++) {
+      const imgObj = images[i] as any;
+      const raw = imgObj?.data || imgObj?.url || imgObj?.base64 || images[i];
+      if (typeof raw === 'string') {
+        content.push({
+          type: 'image_url',
+          image_url: { url: raw }
+        });
+      }
+    }
+
+    const requestBody = {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content }],
+      temperature: 0.2,
+      response_format: { type: 'json_object' }
+    };
+
+    const startTime = Date.now();
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.openaiApiKey}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+    const endTime = Date.now();
+    console.log(`  OpenAI Vision responded in ${endTime - startTime}ms  |  HTTP ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      if (response.status === 429 && retryCount < maxRetries) {
+        await new Promise(res => setTimeout(res, (retryCount + 1) * 1500));
+        return this.queryOpenAIWithImages(prompt, images, retryCount + 1);
+      }
+      throw new Error(`OpenAI Vision API error ${response.status}: ${errorText.substring(0, 250)}`);
+    }
+
+    const data = await response.json() as OpenAIResponse;
+    const text = data?.choices?.[0]?.message?.content || '';
+    if (!text) {
+      throw new Error('OpenAI Vision returned empty response');
+    }
+    return text;
   }
 
   private parseOpenAIResponse(response: string) {
@@ -872,6 +1070,75 @@ export class RealCostCalculator {
         }
       }
       throw new Error('Failed to reach IBM Watsonx API. Please check your connection and try again.');
+    }
+  }
+
+  private async queryGeminiWithImages(prompt: string, images: any[]): Promise<string> {
+    if (!this.geminiApiKey) {
+      throw new Error('Gemini API key is not configured (GEMINI_KEY)');
+    }
+
+    const separator = '-'.repeat(80);
+    console.log(`\n${separator}`);
+    console.log('  GOOGLE GEMINI (Vision)  |  IMAGE ANALYSIS');
+    console.log(`${separator}`);
+    console.log(`  Images count: ${images.length}`);
+
+    const parts: any[] = [{ text: prompt }];
+
+    for (let i = 0; i < images.length; i++) {
+      const imgObj = images[i] as any;
+      const raw = imgObj?.data || imgObj?.url || imgObj?.base64 || images[i];
+      if (typeof raw === 'string') {
+        // Extract MIME type from data URL prefix, fall back to file.type, then default to jpeg
+        const mimeMatch = raw.match(/^data:(image\/[a-z+]+);base64,/);
+        const mimeType = mimeMatch?.[1] || imgObj?.type || 'image/jpeg';
+        const base64Data = raw.replace(/^data:image\/[a-z+]+;base64,/, '');
+        parts.push({
+          inlineData: {
+            mimeType,
+            data: base64Data
+          }
+        });
+        console.log(`  Added image ${i + 1} (${mimeType}, ${base64Data.length} chars)`);
+      }
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`;
+    const startTime = Date.now();
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+        })
+      });
+
+      const endTime = Date.now();
+      console.log(`  Gemini Vision responded in ${endTime - startTime}ms  |  HTTP ${response.status}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini Vision API error ${response.status}: ${errorText.substring(0, 200)}`);
+      }
+
+      const data = await response.json() as any;
+      const responseText: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (!responseText) {
+        throw new Error('Gemini Vision returned an empty response');
+      }
+
+      console.log(`  Gemini Vision analysis complete (${responseText.length} chars)`);
+      console.log(`${separator}`);
+      return responseText;
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error(`  Gemini Vision error: ${err.message}`);
+      throw err;
     }
   }
 

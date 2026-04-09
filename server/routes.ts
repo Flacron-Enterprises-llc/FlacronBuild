@@ -300,7 +300,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...savedEstimate,
         breakdown: realEstimate.breakdown,
         dataSource: realEstimate.dataSource,
-        imageAnalysis: realEstimate.imageAnalysis
+        imageAnalysis: realEstimate.imageAnalysis,
+        apiStatus: realEstimate.apiStatus
       };
       
       console.log('=== BACKEND: Sending Response ===');

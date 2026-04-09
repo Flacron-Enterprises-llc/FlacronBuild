@@ -737,6 +737,41 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
     onSuccess: async (estimate) => {
       console.log('=== FRONTEND: Estimate Generated Successfully ===');
       console.log('Estimate data:', estimate);
+
+      // ── Browser console API status report ────────────────────────────
+      const s = estimate.apiStatus;
+      if (s) {
+        const statusIcon = (v: string) =>
+          v.startsWith('success') ? '✅' :
+          v.includes('rate-limit') || v.includes('429') ? '⚠️' :
+          v.startsWith('skipped') ? '⏭️' :
+          v === 'not-used' ? '➖' : '❌';
+
+        console.group(
+          '%c[FlacronBuild] API Status Report',
+          'background:#ff6600;color:#fff;font-weight:bold;padding:2px 6px;border-radius:3px'
+        );
+        console.log(`%cOpenAI GPT-4o    %c${statusIcon(s.openai)} ${s.openai}`,
+          'font-weight:bold;color:#555', 'color:inherit');
+        if (s.openaiVision) {
+          console.log(`%cOpenAI Vision    %c${statusIcon(s.openaiVision)} ${s.openaiVision}`,
+            'font-weight:bold;color:#555', 'color:inherit');
+        }
+        console.log(`%cGemini Vision    %c${statusIcon(s.geminiVision)} ${s.geminiVision}`,
+          'font-weight:bold;color:#555', 'color:inherit');
+        console.log(`%cIBM Watsonx      %c${statusIcon(s.watsonx)} ${s.watsonx}`,
+          'font-weight:bold;color:#555', 'color:inherit');
+        if (s.geminiFallback !== 'not-used') {
+          console.log(`%cGemini Fallback  %c${statusIcon(s.geminiFallback)} ${s.geminiFallback}`,
+            'font-weight:bold;color:#555', 'color:inherit');
+        }
+        if (s.notes?.length) {
+          console.group('%c⚠️  Warnings / Fallbacks Used', 'color:#e07000;font-weight:bold');
+          s.notes.forEach((note: string) => console.warn(`  • ${note}`));
+          console.groupEnd();
+        }
+        console.groupEnd();
+      }
       
       if (onEstimateGenerated) {
         onEstimateGenerated(estimate);
@@ -820,9 +855,22 @@ export default function EstimationForm({ userRole, onEstimateGenerated, onReport
       }
     },
     onError: (error: any) => {
-      console.error('=== FRONTEND: Estimate Generation Error ===');
-      console.error('Error:', error);
       setIsEstimating(false);
+
+      // ── Detailed browser console error report ─────────────────────────
+      let parsedErr: any = {};
+      try { parsedErr = error?.response ? JSON.parse(error.response) : error; } catch { parsedErr = error; }
+
+      console.group(
+        '%c[FlacronBuild] API Error',
+        'background:#cc0000;color:#fff;font-weight:bold;padding:2px 6px;border-radius:3px'
+      );
+      console.error('%cMessage:', 'font-weight:bold', parsedErr?.message || error?.message || String(error));
+      if (parsedErr?.error)   console.error('%cServer error:', 'font-weight:bold', parsedErr.error);
+      if (parsedErr?.details) console.error('%cStack trace:', 'font-weight:bold', parsedErr.details);
+      if (parsedErr?.retryable === false) console.error('%c⛔ Not retryable — check API key configuration', 'color:#cc0000;font-weight:bold');
+      console.error('%cFull response:', 'font-weight:bold', error);
+      console.groupEnd();
 
       // Parse backend error response for specific messages
       let title = "Estimate Failed";
