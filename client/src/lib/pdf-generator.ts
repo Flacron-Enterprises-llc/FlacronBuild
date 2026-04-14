@@ -1995,7 +1995,7 @@ function addContractorReport(doc: jsPDF, project: any, estimate: any) {
     type: project.projectType || 'Not specified',
     dimensions: {
       totalArea: project.area || report.projectDetails?.dimensions?.totalArea,
-      pitch: project.roofPitch || 'Not specified',
+      pitch: project.roofPitch != null ? String(project.roofPitch) : 'Not specified',
       slopes: project.slopeDamage?.length || 1
     }
   };
@@ -2112,7 +2112,8 @@ function addContractorReport(doc: jsPDF, project: any, estimate: any) {
     [getLocalizedText('structure_type', preferredLanguage), project.structureType],
     [getLocalizedText('existing_materials', preferredLanguage), project.materialLayers?.join(', ')],
     [getLocalizedText('local_permit_required', preferredLanguage), project.localPermit ? 'Yes' : 'No']
-  ].filter(([_, value]) => value && value.trim() !== '' && value !== 'Not specified') as [string, string][];
+  ].filter(([_, value]) => value != null && String(value).trim() !== '' && String(value) !== 'Not specified')
+   .map(([label, value]) => [label, String(value)]) as [string, string][];
 
   detailsFields.forEach(([label, value]) => {
     doc.setFont('helvetica', 'bold');
