@@ -90,8 +90,9 @@ function addSectionHeader(doc: jsPDF, title: string, yPos: number, pageWidth: nu
 }
 
 /** Renders a bold label + wrapped paragraph body. Returns new yPos. */
-function addNarrative(doc: jsPDF, label: string, text: string, margin: number, yPos: number, pageWidth: number): number {
-  if (!text || !text.trim()) return yPos;
+function addNarrative(doc: jsPDF, label: string, text: any, margin: number, yPos: number, pageWidth: number): number {
+  const textStr = text != null ? String(text) : '';
+  if (!textStr.trim()) return yPos;
   const maxWidth = pageWidth - 2 * margin;
   if (label) {
     doc.setFont('helvetica', 'bold');
@@ -101,7 +102,7 @@ function addNarrative(doc: jsPDF, label: string, text: string, margin: number, y
   }
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  const lines = doc.splitTextToSize(text.trim(), maxWidth - 10);
+  const lines = doc.splitTextToSize(textStr.trim(), maxWidth - 10);
   lines.forEach((line: string) => {
     if (yPos > doc.internal.pageSize.height - 20) {
       doc.addPage();
@@ -144,14 +145,15 @@ function addBulletList(doc: jsPDF, label: string, items: string[], margin: numbe
 }
 
 /** Renders a two-column key:value row. Returns new yPos. */
-function addKeyValue(doc: jsPDF, key: string, value: string, margin: number, yPos: number, pageWidth: number, keyWidth = 55): number {
-  if (!value || !value.trim()) return yPos;
+function addKeyValue(doc: jsPDF, key: string, value: any, margin: number, yPos: number, pageWidth: number, keyWidth = 55): number {
+  const valueStr = value != null ? String(value) : '';
+  if (!valueStr.trim()) return yPos;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.text(key, margin, yPos);
   doc.setFont('helvetica', 'normal');
   const maxWidth = pageWidth - margin - keyWidth - 5;
-  const lines = doc.splitTextToSize(value.trim(), maxWidth);
+  const lines = doc.splitTextToSize(valueStr.trim(), maxWidth);
   lines.forEach((line: string, i: number) => {
     if (i > 0 && yPos > doc.internal.pageSize.height - 20) {
       doc.addPage();
@@ -3350,8 +3352,9 @@ function addHomeownerReport(doc: jsPDF, project: any, estimate: any) {
   const nextSteps = hwReport.nextSteps?.recommended || [];
   if (nextSteps.length > 0) {
     yPos = addSectionHeader(doc, 'YOUR NEXT STEPS', yPos, pageWidth, margin);
-    nextSteps.forEach((step: string, i: number) => {
-      if (!step?.trim()) return;
+    nextSteps.forEach((rawStep: any, i: number) => {
+      const step = rawStep != null ? String(rawStep) : '';
+      if (!step.trim()) return;
       if (yPos > doc.internal.pageSize.height - 20) { doc.addPage(); yPos = 20; }
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
