@@ -132,9 +132,9 @@ function ConditionalField({ label, value, formatter }: { label: string; value: a
   const displayValue = formatter ? formatter(value) : value;
   
   return (
-    <div className="flex justify-between border-b border-neutral-200 pb-1">
-      <span className="font-semibold text-neutral-700">{label}:</span>
-      <span className="text-neutral-800">{displayValue}</span>
+    <div className="flex gap-2 justify-between border-b border-neutral-200 pb-1 min-w-0">
+      <span className="font-semibold text-neutral-700 shrink-0">{label}:</span>
+      <span className="text-neutral-800 text-right break-words min-w-0">{displayValue}</span>
     </div>
   );
 }
@@ -186,40 +186,37 @@ function ProjectReportCard({ report, currentUser }: { report: any; currentUser: 
   };
 
   return (
-    <Card className="p-8 rounded-2xl shadow-lg bg-white">
+    <Card className="p-4 sm:p-8 rounded-2xl shadow-lg bg-white min-w-0">
       {/* Project Report Header */}
-      <div className="mb-6 p-6 bg-blue-50 rounded-lg border border-blue-100">
-        <div className="flex items-center mb-4">
-          <FileText className="h-8 w-8 text-blue-600 mr-3" />
-          <h2 className="text-3xl font-extrabold text-blue-700 tracking-tight">Project Report</h2>
+      <div className="mb-6 p-4 sm:p-6 bg-blue-50 rounded-lg border border-blue-100">
+        <div className="flex items-center mb-4 min-w-0">
+          <FileText className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 mr-3 flex-shrink-0" />
+          <h2 className="text-xl sm:text-2xl font-extrabold text-blue-700 tracking-tight truncate">Project Report</h2>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="font-semibold text-neutral-700">Project:</span>
-              <span className="text-neutral-800">{project.name || "Home"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="font-semibold text-neutral-700">Role:</span>
-              <span className="text-neutral-800">{project.userRole || "homeowner"}</span>
-            </div>
+
+        {/* Always single-column stacked layout — avoids overflow when cards are side-by-side */}
+        <div className="space-y-1.5 text-sm">
+          <div className="flex flex-wrap gap-x-2 items-baseline">
+            <span className="font-semibold text-neutral-700 shrink-0">Project:</span>
+            <span className="text-neutral-800 break-words min-w-0">{project.name || "Home"}</span>
           </div>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="font-semibold text-neutral-700">Location:</span>
-              <span className="text-neutral-800">
-                {typeof project.location === 'object' && project.location?.city 
-                  ? `${project.location.city}, ${project.location.country} ${project.location.zipCode}` 
-                  : project.location || "NY, USA 23415"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="font-semibold text-neutral-700">Date:</span>
-              <span className="text-neutral-800">
-                {report.timestamp ? new Date(report.timestamp).toLocaleDateString() : "Date not available"}
-              </span>
-            </div>
+          <div className="flex flex-wrap gap-x-2 items-baseline">
+            <span className="font-semibold text-neutral-700 shrink-0">Location:</span>
+            <span className="text-neutral-800 break-words min-w-0">
+              {typeof project.location === 'object' && project.location?.city
+                ? `${project.location.city}, ${project.location.country}${project.location.zipCode ? ' ' + project.location.zipCode : ''}`
+                : project.location || 'NY, USA 23415'}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-x-2 items-baseline">
+            <span className="font-semibold text-neutral-700 shrink-0">Role:</span>
+            <span className="text-neutral-800 capitalize">{project.userRole || 'homeowner'}</span>
+          </div>
+          <div className="flex flex-wrap gap-x-2 items-baseline">
+            <span className="font-semibold text-neutral-700 shrink-0">Date:</span>
+            <span className="text-neutral-800">
+              {report.timestamp ? new Date(report.timestamp).toLocaleDateString() : 'Date not available'}
+            </span>
           </div>
         </div>
 
@@ -266,8 +263,8 @@ function ProjectReportCard({ report, currentUser }: { report: any; currentUser: 
       {/* Project Info Section */}
       <div className="mb-6">
         <h3 className="text-xl font-bold text-blue-600 mb-4">Project Info</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+
+        <div className="grid grid-cols-1 gap-x-8 gap-y-4">
           <div className="space-y-3">
             {/* Basic Project Fields */}
             <ConditionalField label="Structure Type" value={project.structureType} />
@@ -481,13 +478,13 @@ export default function CompareSlogPage() {
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col">
       <Header />
-      <main className="flex-1 flex flex-col items-center py-8 px-4">
-        <Button variant="outline" className="mb-6" onClick={() => navigate("/compare")}>
+      <main className="flex-1 flex flex-col items-center py-6 px-3 sm:px-4">
+        <Button variant="outline" className="mb-6 self-start" onClick={() => navigate("/compare")}>
           Back to Compare
         </Button>
-        <h1 className="text-2xl font-bold mb-8 text-center">Report Comparison</h1>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-7xl">
+        <h1 className="text-xl sm:text-2xl font-bold mb-6 text-center">Report Comparison</h1>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 w-full max-w-7xl min-w-0">
           {reports.map((report) => (
             <ProjectReportCard key={report.id} report={report} currentUser={currentUser} />
           ))}

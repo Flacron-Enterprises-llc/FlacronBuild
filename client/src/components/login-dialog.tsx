@@ -347,7 +347,7 @@ export default function LoginDialog({ open, onOpenChange, message, onStepChange 
     <>
       <LoadingOverlay isProcessingPayment={isProcessingPayment} />
       <Dialog open={open && !isProcessingPayment} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-3xl w-full px-8 py-6 overflow-hidden">
+        <DialogContent className="max-w-3xl w-full px-4 sm:px-8 py-6 overflow-y-auto max-h-[90vh]">
           <DialogHeader className="space-y-1.5 pb-2">
             <DialogTitle className="text-base font-medium text-center">
               {isSignup

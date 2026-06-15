@@ -45,12 +45,25 @@ function hasData(value: any): boolean {
 function addConditionalField(doc: jsPDF, label: string, value: any, margin: number, yPos: number, formatter?: (val: any) => string): number {
   if (!hasData(value)) return yPos;
   
-  const displayValue = formatter ? formatter(value) : value;
-  
+  const displayValue = String(formatter ? formatter(value) : value);
+  const pageWidth = doc.internal.pageSize.width;
+  const valueX = margin + 50;
+  const maxWidth = pageWidth - valueX - margin;
+
   doc.setFont('helvetica', 'bold');
   doc.text(label, margin, yPos);
   doc.setFont('helvetica', 'normal');
-  doc.text(displayValue, margin + 50, yPos);
+
+  // Wrap the value so it never overflows the right margin
+  const lines = doc.splitTextToSize(displayValue, maxWidth);
+  lines.forEach((line: string, i: number) => {
+    if (i > 0 && yPos > doc.internal.pageSize.height - 20) {
+      doc.addPage();
+      yPos = 20;
+    }
+    doc.text(line, valueX, yPos);
+    if (i < lines.length - 1) yPos += 5;
+  });
   return yPos + 7;
 }
 
@@ -1348,8 +1361,8 @@ function addInsuranceReport(doc: jsPDF, project: any, estimate: any) {
   const claimMetadata = report.claimMetadata || {
     claimNumber: project.claimNumber || 'Not provided',
     policyholder: project.policyholderName || 'Not provided',
-    adjusterName: project.insuranceAdjusterInfo?.companyName || project.adjusterName || 'Not provided',
-    adjusterContact: project.insuranceAdjusterInfo?.adjusterId || project.adjusterContact || 'Not provided',
+    adjusterName: project.adjusterName || 'Not provided',
+    adjusterContact: project.adjusterContact || 'Not provided',
     dateOfLoss: project.dateOfLoss || 'Not provided',
     dateOfInspection: new Date().toLocaleDateString()
   };
@@ -1420,7 +1433,7 @@ function addInsuranceReport(doc: jsPDF, project: any, estimate: any) {
   // Add inspection summary fields conditionally
   const propertyAddress = inspectionSummary.propertyAddress || 
     (project.location?.city ? `${project.location.city}, ${project.location.country || ''} ${project.location.zipCode || ''}`.trim() : null);
-  yPos = addConditionalField(doc, 'Property Address:', propertyAddress, margin, yPos);
+  yPos = addConditionalFieldWithWrap(doc, 'Property Address:', propertyAddress, margin, yPos, pageWidth);
   yPos = addConditionalField(doc, 'Structure Type:', inspectionSummary.structureType || project.structureType, margin, yPos);
   yPos = addConditionalField(doc, 'Roof Age:', inspectionSummary.roofAge || (project.roofAge ? `${project.roofAge} years` : null), margin, yPos);
   yPos = addConditionalField(doc, 'Roof Pitch:', inspectionSummary.roofPitch || project.roofPitch, margin, yPos);
@@ -3131,15 +3144,17 @@ function addHomeownerReport(doc: jsPDF, project: any, estimate: any) {
       yPos += 3;
     }
 
-    // Permits & Contingency
-    if (estPermits > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('Permits & Fees:', margin + 4, yPos);
-      doc.text(formatCurrency(estPermits, preferredCurrency), pageWidth - margin, yPos, { align: 'right' });
-      doc.setFont('helvetica', 'normal');
-      yPos += 6;
-    }
+    // Permits & Contingency — always show permits row for transparency
+    if (yPos > doc.internal.pageSize.height - 24) { doc.addPage(); yPos = 20; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Permits & Fees:', margin + 4, yPos);
+    doc.text(
+      estPermits > 0 ? formatCurrency(estPermits, preferredCurrency) : 'Included',
+      pageWidth - margin, yPos, { align: 'right' }
+    );
+    doc.setFont('helvetica', 'normal');
+    yPos += 6;
     if (estContingency > 0) {
       const hoBaseCost = Math.max(0, estMat + estLabor + estPermits);
       const hoContPct = hoBaseCost > 0 ? ((estContingency / hoBaseCost) * 100).toFixed(1) : '0.0';

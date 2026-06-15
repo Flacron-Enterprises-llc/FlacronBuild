@@ -499,6 +499,10 @@ Each string must describe visible damage, material condition, and repair recomme
       
       const repairJson = (raw: string): string => {
         let s = raw;
+        // Strip single-line JS-style comments (LLMs sometimes emit these)
+        s = s.replace(/\/\/[^\n]*/g, '');
+        // Strip block comments
+        s = s.replace(/\/\*[\s\S]*?\*\//g, '');
         // Fix missing commas between properties: }"  or ]"  or ""  patterns across lines
         s = s.replace(/"\s*\n(\s*")/g, '",\n$1');
         s = s.replace(/\}\s*\n(\s*")/g, '},\n$1');
@@ -514,31 +518,71 @@ Each string must describe visible damage, material condition, and repair recomme
         return s;
       };
 
+      // Last-resort recovery: walk the string and close all unclosed brackets/braces
+      const repairTruncatedJson = (raw: string): string => {
+        const stack: string[] = [];
+        let inString = false;
+        let escape = false;
+        for (const ch of raw) {
+          if (escape) { escape = false; continue; }
+          if (ch === '\\' && inString) { escape = true; continue; }
+          if (ch === '"') { inString = !inString; continue; }
+          if (inString) continue;
+          if (ch === '{') stack.push('}');
+          else if (ch === '[') stack.push(']');
+          else if (ch === '}' || ch === ']') stack.pop();
+        }
+        let fixed = raw;
+        // If we ended mid-string, close it first
+        if (inString) fixed += '"';
+        // Close all open structures in reverse order
+        return fixed + stack.reverse().join('');
+      };
+
       const parseReportJson = (raw: string): any => {
         let clean = raw.trim();
         clean = clean.replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '');
         clean = clean.replace(/^```\s*/, '').replace(/\s*```$/, '');
         const start = clean.indexOf('{');
-        const end = clean.lastIndexOf('}');
-        if (start !== -1 && end !== -1 && end > start) {
-          clean = clean.substring(start, end + 1);
+        // Don't trim at lastIndexOf('}') — the JSON may be genuinely truncated
+        if (start !== -1) {
+          clean = clean.substring(start);
         }
         clean = clean.replace(/^const\s+\w+\s*=\s*/, '').replace(/;\s*$/, '');
+
+        let firstErr: unknown;
+
+        // Attempt 1: direct parse (handles valid but possibly truncated-at-brace JSON)
         try {
           return JSON.parse(clean);
-        } catch (firstErr) {
-          // Attempt auto-repair of common LLM JSON errors
-          console.log('  JSON parse failed, attempting auto-repair...');
-          const repaired = repairJson(clean);
-          try {
-            const result = JSON.parse(repaired);
-            console.log('  Auto-repair succeeded');
-            return result;
-          } catch {
-            // Throw the original error for clearer debugging
-            throw firstErr;
-          }
+        } catch (e) { firstErr = e; }
+
+        // Attempt 2: trim to last closing brace and parse
+        const lastBrace = clean.lastIndexOf('}');
+        if (lastBrace > 0) {
+          try { return JSON.parse(clean.substring(0, lastBrace + 1)); } catch { /* fall through */ }
         }
+
+        // Attempt 3: auto-repair of common LLM JSON formatting errors
+        console.log('  JSON parse failed, attempting auto-repair...');
+        const repaired = repairJson(clean);
+        try {
+          const result = JSON.parse(repaired);
+          console.log('  Auto-repair succeeded');
+          return result;
+        } catch { /* fall through */ }
+
+        // Attempt 4: close all unclosed brackets (handles model token-limit truncation)
+        console.log('  Auto-repair failed, attempting truncation recovery...');
+        try {
+          const recovered = repairTruncatedJson(repaired);
+          const result = JSON.parse(recovered);
+          console.log('  Truncation recovery succeeded');
+          return result;
+        } catch { /* fall through */ }
+
+        // All attempts exhausted — throw the original parse error
+        throw firstErr;
       };
 
       const mergeCostsIntoReport = (rj: any) => {
